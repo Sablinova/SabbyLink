@@ -9,8 +9,8 @@ import { z } from 'zod';
 
 // Environment schema with validation
 const envSchema = z.object({
-  // Discord
-  DISCORD_TOKEN: z.string().min(1, 'Discord token is required'),
+  // Discord (optional - can be set via dashboard)
+  DISCORD_TOKEN: z.string().optional(),
   
   // Backend
   BACKEND_PORT: z.string().transform(Number).pipe(z.number().int().positive()).default('3000'),
