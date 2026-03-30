@@ -1,0 +1,126 @@
+version: '3.8'
+
+# Production docker-compose for use with external reverse proxy (NPM)
+# Usage: docker compose -f docker-compose.prod.yml up -d
+
+services:
+  # Backend service (Bun + Discord bot + REST API + WebSocket)
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: sabbylink-backend
+    restart: unless-stopped
+    ports:
+      # Expose backend API for NPM proxy
+      - "127.0.0.1:3100:3000"
+    environment:
+      # Discord
+      - DISCORD_TOKEN=${DISCORD_TOKEN}
+      
+      # Backend
+      - BACKEND_PORT=3000
+      - NODE_ENV=production
+      - DATABASE_URL=/data/sabbylink.db
+      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
+      - JWT_SECRET=${JWT_SECRET}
+      - JWT_EXPIRES_IN=${JWT_EXPIRES_IN:-7d}
+      - DEBUG=${DEBUG:-false}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      
+      # CORS - allow the frontend domain
+      - CORS_ORIGIN=${CORS_ORIGIN:-https://sabbylink.2b.sablinova.com}
+      
+      # AI Providers
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4-turbo-preview}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - ANTHROPIC_MODEL=${ANTHROPIC_MODEL:-claude-3-sonnet-20240229}
+      - GOOGLE_AI_API_KEY=${GOOGLE_AI_API_KEY:-}
+      - GOOGLE_AI_MODEL=${GOOGLE_AI_MODEL:-gemini-pro}
+      - GROQ_API_KEY=${GROQ_API_KEY:-}
+      - GROQ_MODEL=${GROQ_MODEL:-mixtral-8x7b-32768}
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://localhost:11434}
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-llama2}
+      - DEFAULT_AI_PROVIDER=${DEFAULT_AI_PROVIDER:-openai}
+      - AI_TEMPERATURE=${AI_TEMPERATURE:-0.7}
+      - AI_MAX_TOKENS=${AI_MAX_TOKENS:-1000}
+      
+      # Rate Limiting
+      - RATE_LIMIT_MAX=${RATE_LIMIT_MAX:-100}
+      - RATE_LIMIT_WINDOW_MS=${RATE_LIMIT_WINDOW_MS:-60000}
+      
+      # Feature Toggles
+      - ENABLE_RPC=${ENABLE_RPC:-true}
+      - ENABLE_AI_RESPONDER=${ENABLE_AI_RESPONDER:-false}
+      - ENABLE_NITRO_SNIPER=${ENABLE_NITRO_SNIPER:-false}
+      - ENABLE_GIVEAWAY_JOINER=${ENABLE_GIVEAWAY_JOINER:-false}
+      - ENABLE_MESSAGE_LOGGER=${ENABLE_MESSAGE_LOGGER:-true}
+      - ENABLE_AUTO_REACTIONS=${ENABLE_AUTO_REACTIONS:-false}
+      - ENABLE_AFK_SYSTEM=${ENABLE_AFK_SYSTEM:-true}
+      
+      # RPC
+      - RPC_PLATFORM=${RPC_PLATFORM:-pc}
+      - RPC_ANIMATION_ENABLED=${RPC_ANIMATION_ENABLED:-false}
+      - RPC_ANIMATION_INTERVAL=${RPC_ANIMATION_INTERVAL:-30}
+      
+      # Backup
+      - AUTO_BACKUP_ENABLED=${AUTO_BACKUP_ENABLED:-true}
+      - AUTO_BACKUP_INTERVAL_HOURS=${AUTO_BACKUP_INTERVAL_HOURS:-24}
+      - BACKUP_DIR=/backups
+      
+      # Security
+      - ENABLE_RATE_LIMITING=${ENABLE_RATE_LIMITING:-true}
+      
+      # Analytics
+      - ENABLE_ANALYTICS=${ENABLE_ANALYTICS:-true}
+    
+    volumes:
+      - sabbylink-data:/data
+      - sabbylink-backups:/backups
+      - sabbylink-logs:/app/logs
+    
+    networks:
+      - sabbylink-network
+    
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Frontend service (React SPA served via nginx)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        - VITE_API_URL=https://sabbylink.2b.sablinova.com/api
+        - VITE_WS_URL=wss://sabbylink.2b.sablinova.com/ws
+    container_name: sabbylink-frontend
+    restart: unless-stopped
+    ports:
+      # Expose frontend for NPM proxy
+      - "127.0.0.1:3101:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - sabbylink-network
+
+networks:
+  sabbylink-network:
+    driver: bridge
+    name: sabbylink-network
+
+volumes:
+  sabbylink-data:
+    name: sabbylink-data
+    driver: local
+  sabbylink-backups:
+    name: sabbylink-backups
+    driver: local
+  sabbylink-logs:
+    name: sabbylink-logs
+    driver: local
