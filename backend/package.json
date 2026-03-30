@@ -1,0 +1,58 @@
+{
+  "name": "sabbylink-backend",
+  "version": "0.1.0",
+  "description": "SabbyLink backend - Discord selfbot with AI integration and web API",
+  "main": "src/index.ts",
+  "type": "module",
+  "scripts": {
+    "dev": "bun --watch src/index.ts",
+    "start": "bun src/index.ts",
+    "build": "bun build src/index.ts --outdir dist --target bun",
+    "db:generate": "drizzle-kit generate:sqlite",
+    "db:migrate": "bun src/db/migrate.ts",
+    "db:studio": "drizzle-kit studio",
+    "lint": "eslint src --ext .ts",
+    "format": "prettier --write \"src/**/*.ts\"",
+    "test": "bun test"
+  },
+  "keywords": [
+    "discord",
+    "selfbot",
+    "ai",
+    "automation",
+    "bun"
+  ],
+  "author": "SabbyLink Contributors",
+  "license": "GPL-3.0",
+  "dependencies": {
+    "@elysiajs/cors": "^1.0.2",
+    "@elysiajs/jwt": "^1.0.2",
+    "@elysiajs/static": "^1.0.2",
+    "discord.js-selfbot-v13": "^3.0.1",
+    "drizzle-orm": "^0.29.3",
+    "elysia": "^1.0.0",
+    "openai": "^4.28.0",
+    "@anthropic-ai/sdk": "^0.17.0",
+    "@google/generative-ai": "^0.2.0",
+    "groq-sdk": "^0.3.0",
+    "zod": "^3.22.4",
+    "bcrypt": "^5.1.1",
+    "jsonwebtoken": "^9.0.2",
+    "winston": "^3.11.0"
+  },
+  "devDependencies": {
+    "@types/bcrypt": "^5.0.2",
+    "@types/jsonwebtoken": "^9.0.5",
+    "@types/node": "^20.11.16",
+    "better-sqlite3": "^9.3.0",
+    "drizzle-kit": "^0.20.13",
+    "eslint": "^8.56.0",
+    "@typescript-eslint/eslint-plugin": "^6.20.0",
+    "@typescript-eslint/parser": "^6.20.0",
+    "prettier": "^3.2.5",
+    "bun-types": "^1.0.25"
+  },
+  "engines": {
+    "bun": ">=1.0.0"
+  }
+}
