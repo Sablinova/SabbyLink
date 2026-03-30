@@ -12,25 +12,10 @@ WORKDIR /app
 # Copy package files only (no lockfile)
 COPY package.json ./
 
-# Install dependencies without lockfile
+# Install all dependencies (including dev for build)
 RUN rm -f bun.lockb && bun install --no-save
 
-# Stage 2: Builder
-FROM oven/bun:1.0-alpine AS builder
-
-WORKDIR /app
-
-# Copy dependencies from deps stage
-COPY --from=deps /app/node_modules ./node_modules
-
-# Copy source code
-COPY . .
-
-# Build TypeScript (if needed for production optimizations)
-# Bun can run TypeScript directly, but building can optimize startup
-RUN bun build src/index.ts --outdir dist --target bun
-
-# Stage 3: Runner (production)
+# Stage 2: Runner (production)
 FROM oven/bun:1.0-alpine AS runner
 
 # Install curl for healthchecks
@@ -42,10 +27,11 @@ WORKDIR /app
 RUN addgroup --system --gid 1001 sabbylink && \
     adduser --system --uid 1001 sabbylink
 
-# Copy necessary files from builder
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/package.json ./
+# Copy dependencies from deps stage
+COPY --from=deps /app/node_modules ./node_modules
+
+# Copy source code (Bun runs TypeScript directly)
+COPY . .
 
 # Create data directories
 RUN mkdir -p /data /backups /app/logs && \
@@ -65,5 +51,5 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
 ENV NODE_ENV=production \
     PORT=3000
 
-# Start the application
-CMD ["bun", "run", "dist/index.js"]
+# Start the application (Bun runs TypeScript directly)
+CMD ["bun", "run", "src/index.ts"]
