@@ -8,11 +8,11 @@ FROM oven/bun:1.0-alpine AS builder
 
 WORKDIR /app
 
-# Copy package files
-COPY package.json bun.lockb* ./
+# Copy package files only (no lockfile)
+COPY package.json ./
 
-# Install dependencies (no lockfile check for initial builds)
-RUN bun install
+# Install dependencies without lockfile
+RUN rm -f bun.lockb && bun install --no-save
 
 # Copy source code
 COPY . .
