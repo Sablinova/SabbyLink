@@ -18,8 +18,8 @@ RUN rm -f bun.lockb && bun install --no-save
 # Stage 2: Runner (production)
 FROM oven/bun:1.0-alpine AS runner
 
-# Install curl for healthchecks
-RUN apk add --no-cache curl
+# Install curl for healthchecks and libstdc++ for native modules
+RUN apk add --no-cache curl libstdc++
 
 WORKDIR /app
 
