@@ -15,7 +15,7 @@ import { APP_NAME, APP_VERSION, API_PREFIX } from '@/config/constants';
 import { initDatabase, closeDatabase } from '@/db';
 import { logger } from '@/utils/logger';
 import { authenticate } from '@/api/middleware/auth';
-import { rateLimitMiddleware } from '@/api/middleware/rate-limit';
+import { rateLimiting } from '@/api/middleware/rate-limit';
 import { authRoutes } from '@/api/routes/auth';
 import { botRoutes } from '@/api/routes/bot';
 import { rpcRoutes } from '@/api/routes/rpc';
@@ -62,7 +62,7 @@ function createApp() {
       credentials: true,
     }))
     // Rate limiting
-    .use(rateLimitMiddleware)
+    .use(rateLimiting)
     
     // Health check endpoint
     .get(`${API_PREFIX}/health`, () => ({
