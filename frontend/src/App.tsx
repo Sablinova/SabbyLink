@@ -1,43 +1,148 @@
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { useEffect } from 'react';
+import { useAuthStore } from './store/auth';
+import { useThemeStore } from './store/theme';
+
+// Layouts
+import DashboardLayout from './layouts/DashboardLayout';
+import AuthLayout from './layouts/AuthLayout';
+
+// Pages
+import LoginPage from './pages/LoginPage';
+import RegisterPage from './pages/RegisterPage';
+import DashboardPage from './pages/DashboardPage';
+import BotPage from './pages/BotPage';
+import RPCPage from './pages/RPCPage';
+import CommandsPage from './pages/CommandsPage';
+import AIPage from './pages/AIPage';
+import SettingsPage from './pages/SettingsPage';
+
+// Protected route component
+function ProtectedRoute({ children }: { children: React.ReactNode }) {
+  const { isAuthenticated, checkAuth } = useAuthStore();
+
+  useEffect(() => {
+    checkAuth();
+  }, [checkAuth]);
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+
+  return <>{children}</>;
+}
+
+// Public route component (redirects to dashboard if logged in)
+function PublicRoute({ children }: { children: React.ReactNode }) {
+  const { isAuthenticated } = useAuthStore();
+
+  if (isAuthenticated) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  return <>{children}</>;
+}
+
 function App() {
+  const { setTheme, theme } = useThemeStore();
+
+  // Initialize theme on mount
+  useEffect(() => {
+    setTheme(theme);
+  }, []);
+
   return (
-    <div style={{
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'center',
-      justifyContent: 'center',
-      minHeight: '100vh',
-      backgroundColor: '#0f172a',
-      color: 'white',
-      fontFamily: 'system-ui, -apple-system, sans-serif',
-      padding: '2rem',
-    }}>
-      <h1 style={{ fontSize: '3rem', marginBottom: '1rem' }}>🔗 SabbyLink</h1>
-      <p style={{ fontSize: '1.25rem', opacity: 0.8, textAlign: 'center', maxWidth: '600px' }}>
-        Advanced Discord Selfbot with AI Integration
-      </p>
-      <div style={{
-        marginTop: '2rem',
-        padding: '1.5rem',
-        backgroundColor: '#1e293b',
-        borderRadius: '0.5rem',
-        maxWidth: '500px',
-        width: '100%',
-      }}>
-        <h2 style={{ fontSize: '1.5rem', marginBottom: '1rem' }}>Coming Soon</h2>
-        <ul style={{ listStyle: 'none', padding: 0, opacity: 0.9 }}>
-          <li style={{ padding: '0.5rem 0' }}>✅ Project planning complete</li>
-          <li style={{ padding: '0.5rem 0' }}>✅ Backend foundation ready</li>
-          <li style={{ padding: '0.5rem 0' }}>✅ Database schema defined</li>
-          <li style={{ padding: '0.5rem 0' }}>🚧 Discord bot integration</li>
-          <li style={{ padding: '0.5rem 0' }}>🚧 Web dashboard UI</li>
-          <li style={{ padding: '0.5rem 0' }}>🚧 AI provider adapters</li>
-          <li style={{ padding: '0.5rem 0' }}>🚧 RPC system</li>
-        </ul>
-      </div>
-      <p style={{ marginTop: '2rem', opacity: 0.6, fontSize: '0.875rem' }}>
-        Version 0.1.0 (Pre-release) • GPL-3.0 License
-      </p>
-    </div>
+    <Router>
+      <Routes>
+        {/* Public routes */}
+        <Route
+          path="/login"
+          element={
+            <PublicRoute>
+              <AuthLayout>
+                <LoginPage />
+              </AuthLayout>
+            </PublicRoute>
+          }
+        />
+        <Route
+          path="/register"
+          element={
+            <PublicRoute>
+              <AuthLayout>
+                <RegisterPage />
+              </AuthLayout>
+            </PublicRoute>
+          }
+        />
+
+        {/* Protected routes */}
+        <Route
+          path="/dashboard"
+          element={
+            <ProtectedRoute>
+              <DashboardLayout>
+                <DashboardPage />
+              </DashboardLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/bot"
+          element={
+            <ProtectedRoute>
+              <DashboardLayout>
+                <BotPage />
+              </DashboardLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/rpc"
+          element={
+            <ProtectedRoute>
+              <DashboardLayout>
+                <RPCPage />
+              </DashboardLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/commands"
+          element={
+            <ProtectedRoute>
+              <DashboardLayout>
+                <CommandsPage />
+              </DashboardLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/ai"
+          element={
+            <ProtectedRoute>
+              <DashboardLayout>
+                <AIPage />
+              </DashboardLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/settings"
+          element={
+            <ProtectedRoute>
+              <DashboardLayout>
+                <SettingsPage />
+              </DashboardLayout>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Redirects */}
+        <Route path="/" element={<Navigate to="/dashboard" replace />} />
+        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+      </Routes>
+    </Router>
   );
 }
 

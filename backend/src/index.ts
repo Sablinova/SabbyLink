@@ -13,7 +13,19 @@ import { cors } from '@elysiajs/cors';
 import { env } from '@/config/env';
 import { APP_NAME, APP_VERSION, API_PREFIX } from '@/config/constants';
 import { initDatabase, closeDatabase } from '@/db';
-import { log } from '@/utils/logger';
+import { logger } from '@/utils/logger';
+import { authMiddleware } from '@/api/middleware/auth';
+import { rateLimitMiddleware } from '@/api/middleware/rate-limit';
+import { authRoutes } from '@/api/routes/auth';
+import { botRoutes } from '@/api/routes/bot';
+import { rpcRoutes } from '@/api/routes/rpc';
+import { commandsRoutes } from '@/api/routes/commands';
+import { aiRoutes } from '@/api/routes/ai';
+import { analyticsRoutes } from '@/api/routes/analytics';
+import { settingsRoutes } from '@/api/routes/settings';
+import { wsManager } from '@/ws';
+import { botManager } from '@/bot';
+import { rpcManager } from '@/bot/rpc';
 
 // ASCII art banner
 const banner = `
@@ -49,6 +61,8 @@ function createApp() {
       origin: env.NODE_ENV === 'development',
       credentials: true,
     }))
+    // Rate limiting
+    .use(rateLimitMiddleware)
     
     // Health check endpoint
     .get(`${API_PREFIX}/health`, () => ({
@@ -57,6 +71,8 @@ function createApp() {
       version: APP_VERSION,
       timestamp: new Date().toISOString(),
       uptime: process.uptime(),
+      memory: process.memoryUsage(),
+      websockets: wsManager.getTotalClients(),
     }))
     
     // API info endpoint
@@ -78,6 +94,29 @@ function createApp() {
       },
     }))
     
+    // Public auth routes (no middleware)
+    .use(authRoutes)
+    
+    // Protected routes (require authentication)
+    .use(authMiddleware)
+    .use(botRoutes)
+    .use(rpcRoutes)
+    .use(commandsRoutes)
+    .use(aiRoutes)
+    .use(analyticsRoutes)
+    .use(settingsRoutes)
+    
+    // WebSocket endpoint
+    .ws('/ws', {
+      open: (ws) => wsManager.handleConnection(ws),
+      message: (ws, message) => {
+        if (typeof message === 'string') {
+          wsManager.handleMessage(ws, message);
+        }
+      },
+      close: (ws) => wsManager.handleClose(ws),
+    })
+    
     // 404 handler
     .onError(({ code, error, set }) => {
       if (code === 'NOT_FOUND') {
@@ -90,7 +129,7 @@ function createApp() {
       }
       
       // Generic error handler
-      log.error('API Error:', error);
+      logger.error('API Error:', error);
       set.status = 500;
       return {
         error: 'Internal Server Error',
@@ -110,9 +149,9 @@ async function start() {
     // Print banner
     console.log(banner);
     
-    log.info(`Starting ${APP_NAME} v${APP_VERSION}...`);
-    log.info(`Environment: ${env.NODE_ENV}`);
-    log.info(`Port: ${env.BACKEND_PORT}`);
+    logger.info(`Starting ${APP_NAME} v${APP_VERSION}...`);
+    logger.info(`Environment: ${env.NODE_ENV}`);
+    logger.info(`Port: ${env.BACKEND_PORT}`);
     
     // 1. Initialize database
     await initDatabase();
@@ -121,25 +160,31 @@ async function start() {
     const app = createApp();
     
     app.listen(env.BACKEND_PORT, () => {
-      log.success(`API server listening on port ${env.BACKEND_PORT}`);
-      log.info(`Health check: http://localhost:${env.BACKEND_PORT}${API_PREFIX}/health`);
-      log.info(`API info: http://localhost:${env.BACKEND_PORT}${API_PREFIX}/info`);
+      logger.info(`API server listening on port ${env.BACKEND_PORT}`);
+      logger.info(`Health check: http://localhost:${env.BACKEND_PORT}${API_PREFIX}/health`);
+      logger.info(`API info: http://localhost:${env.BACKEND_PORT}${API_PREFIX}/info`);
+      logger.info(`WebSocket: ws://localhost:${env.BACKEND_PORT}/ws`);
     });
     
-    // 3. TODO: Initialize Discord bot client
-    // await initBot();
+    // 3. Initialize WebSocket manager with server
+    wsManager.initialize(app.server!);
     
-    // 4. TODO: Initialize WebSocket server
-    // await initWebSocket();
+    // 4. Auto-start bots
+    logger.info('Starting auto-start sequence...');
+    await botManager.autoStart();
+    logger.info('Bots auto-started');
     
-    // 5. TODO: Initialize AI providers
-    // await initAI();
+    // 5. Wait for bots to be ready, then auto-start RPCs
+    setTimeout(async () => {
+      await rpcManager.autoStart();
+      logger.info('RPCs auto-started');
+    }, 5000);
     
-    log.success(`${APP_NAME} is ready! 🚀`);
-    log.info('Press Ctrl+C to stop');
+    logger.info(`${APP_NAME} is ready! 🚀`);
+    logger.info('Press Ctrl+C to stop');
     
   } catch (error) {
-    log.error('Failed to start application:', error);
+    logger.error('Failed to start application:', error);
     process.exit(1);
   }
 }
@@ -149,19 +194,20 @@ async function start() {
  */
 function setupShutdownHandlers() {
   const shutdown = async (signal: string) => {
-    log.info(`Received ${signal}, shutting down gracefully...`);
+    logger.info(`Received ${signal}, shutting down gracefully...`);
     
     try {
+      // Stop all bots
+      logger.info('Stopping bots...');
+      // botManager handles cleanup internally
+      
       // Close database connection
       closeDatabase();
       
-      // TODO: Close Discord client
-      // TODO: Close WebSocket connections
-      
-      log.success('Shutdown complete');
+      logger.info('Shutdown complete');
       process.exit(0);
     } catch (error) {
-      log.error('Error during shutdown:', error);
+      logger.error('Error during shutdown:', error);
       process.exit(1);
     }
   };
