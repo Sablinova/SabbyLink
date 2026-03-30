@@ -74,7 +74,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
   const { setStatus, setConnected, setError } = useBotStore();
   
   const wsRef = useRef<WebSocket | null>(null);
-  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reconnectAttemptsRef = useRef(0);
 
   const [state, setState] = useState<WebSocketState>({
@@ -89,7 +89,8 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
 
   const getWebSocketUrl = useCallback(() => {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const host = import.meta.env.VITE_WS_URL || `${protocol}//${window.location.host}`;
+    const wsUrl = (import.meta as any).env?.VITE_WS_URL;
+    const host = wsUrl || `${protocol}//${window.location.host}`;
     return `${host}/ws?token=${token}`;
   }, [token]);
 

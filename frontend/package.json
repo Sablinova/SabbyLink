@@ -36,7 +36,8 @@
     "recharts": "^2.10.4",
     "clsx": "^2.1.0",
     "lucide-react": "^0.316.0",
-    "date-fns": "^3.3.1"
+    "date-fns": "^3.3.1",
+    "axios": "^1.6.7"
   },
   "devDependencies": {
     "@types/react": "^18.2.48",

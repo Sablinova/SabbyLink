@@ -31,6 +31,8 @@ interface BotState {
   restart: () => Promise<void>;
   fetchGuilds: () => Promise<void>;
   setStatus: (status: BotState['status']) => void;
+  setConnected: (connected: boolean) => void;
+  setError: (error: string | null) => void;
   clearError: () => void;
 }
 
@@ -131,6 +133,10 @@ export const useBotStore = create<BotState>((set, get) => ({
   },
 
   setStatus: (status) => set({ status }),
+
+  setConnected: (connected) => set({ status: connected ? 'online' : 'offline' }),
+
+  setError: (error) => set({ error, status: error ? 'error' : 'offline' }),
 
   clearError: () => set({ error: null }),
 }));

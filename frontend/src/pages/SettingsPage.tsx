@@ -1,17 +1,17 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { 
-  Cog6ToothIcon, 
-  KeyIcon, 
-  BellIcon, 
-  ShieldCheckIcon,
-  PaintBrushIcon,
-  ServerIcon,
-  TrashIcon,
-  ArrowPathIcon,
-  CheckCircleIcon,
-  ExclamationTriangleIcon
-} from '@heroicons/react/24/outline';
+  Settings as Cog6ToothIcon, 
+  Key as KeyIcon, 
+  Bell as BellIcon, 
+  ShieldCheck as ShieldCheckIcon,
+  Paintbrush as PaintBrushIcon,
+  Server as ServerIcon,
+  Trash2 as TrashIcon,
+  RefreshCw as ArrowPathIcon,
+  CheckCircle as CheckCircleIcon,
+  AlertTriangle as ExclamationTriangleIcon
+} from 'lucide-react';
 import { useThemeStore } from '../store/theme';
 import { api } from '../lib/api';
 

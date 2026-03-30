@@ -1,6 +1,6 @@
-import axios from 'axios';
+import axios, { AxiosError, InternalAxiosRequestConfig, AxiosResponse } from 'axios';
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001/api/v1';
+const API_BASE = (import.meta as any).env?.VITE_API_URL || 'http://localhost:3001/api/v1';
 
 export const api = axios.create({
   baseURL: API_BASE,
@@ -10,7 +10,7 @@ export const api = axios.create({
 });
 
 // Request interceptor - add auth token
-api.interceptors.request.use((config) => {
+api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   const token = localStorage.getItem('sabbylink_token');
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
@@ -20,8 +20,8 @@ api.interceptors.request.use((config) => {
 
 // Response interceptor - handle errors
 api.interceptors.response.use(
-  (response) => response,
-  (error) => {
+  (response: AxiosResponse) => response,
+  (error: AxiosError) => {
     if (error.response?.status === 401) {
       localStorage.removeItem('sabbylink_token');
       window.location.href = '/login';

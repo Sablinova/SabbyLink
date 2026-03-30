@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { aiApi } from '../lib/api';
-import { Brain, Send, Plus, Settings, Trash2, Loader2 } from 'lucide-react';
+import { Brain, Send, Plus, Settings, Loader2 } from 'lucide-react';
 
 interface Message {
   role: 'user' | 'assistant';
