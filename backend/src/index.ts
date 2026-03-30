@@ -14,7 +14,7 @@ import { env } from '@/config/env';
 import { APP_NAME, APP_VERSION, API_PREFIX } from '@/config/constants';
 import { initDatabase, closeDatabase } from '@/db';
 import { logger } from '@/utils/logger';
-import { authMiddleware } from '@/api/middleware/auth';
+import { authenticate } from '@/api/middleware/auth';
 import { rateLimitMiddleware } from '@/api/middleware/rate-limit';
 import { authRoutes } from '@/api/routes/auth';
 import { botRoutes } from '@/api/routes/bot';
@@ -98,7 +98,7 @@ function createApp() {
     .use(authRoutes)
     
     // Protected routes (require authentication)
-    .use(authMiddleware)
+    .use(authenticate)
     .use(botRoutes)
     .use(rpcRoutes)
     .use(commandsRoutes)
