@@ -1,6 +1,6 @@
 import { Elysia } from 'elysia';
 import { db } from '../../db';
-import { analyticsPetDaily, messageLogs, commandLogs } from '../../db/schema';
+import { analyticsDaily, messageLogs, commandLogs } from '../../db/schema';
 import { eq, and, gte, lte, desc, count, sql } from 'drizzle-orm';
 import { logger } from '../../utils/logger';
 
@@ -15,10 +15,10 @@ export const analyticsRoutes = new Elysia({ prefix: '/analytics' })
       // Get today's analytics
       const today = new Date().toISOString().split('T')[0];
       
-      const todayStats = await db.query.analyticsPetDaily.findFirst({
+      const todayStats = await db.query.analyticsDaily.findFirst({
         where: and(
-          eq(analyticsPetDaily.userId, userId),
-          eq(analyticsPetDaily.date, today)
+          eq(analyticsDaily.userId, userId),
+          eq(analyticsDaily.date, today)
         ),
       });
 
@@ -26,12 +26,12 @@ export const analyticsRoutes = new Elysia({ prefix: '/analytics' })
       const sevenDaysAgo = new Date();
       sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
       
-      const weekStats = await db.query.analyticsPetDaily.findMany({
+      const weekStats = await db.query.analyticsDaily.findMany({
         where: and(
-          eq(analyticsPetDaily.userId, userId),
-          gte(analyticsPetDaily.date, sevenDaysAgo.toISOString().split('T')[0])
+          eq(analyticsDaily.userId, userId),
+          gte(analyticsDaily.date, sevenDaysAgo.toISOString().split('T')[0])
         ),
-        orderBy: [desc(analyticsPetDaily.date)],
+        orderBy: [desc(analyticsDaily.date)],
       });
 
       // Calculate totals for the week
@@ -148,12 +148,12 @@ export const analyticsRoutes = new Elysia({ prefix: '/analytics' })
       const daysAgo = new Date();
       daysAgo.setDate(daysAgo.getDate() - parseInt(days as string));
 
-      const dailyStats = await db.query.analyticsPetDaily.findMany({
+      const dailyStats = await db.query.analyticsDaily.findMany({
         where: and(
-          eq(analyticsPetDaily.userId, userId),
-          gte(analyticsPetDaily.date, daysAgo.toISOString().split('T')[0])
+          eq(analyticsDaily.userId, userId),
+          gte(analyticsDaily.date, daysAgo.toISOString().split('T')[0])
         ),
-        orderBy: [desc(analyticsPetDaily.date)],
+        orderBy: [desc(analyticsDaily.date)],
       });
 
       // Calculate totals
