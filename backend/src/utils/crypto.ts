@@ -88,5 +88,11 @@ class EncryptionUtil {
 // Export singleton instance
 export const encryption = new EncryptionUtil(env.ENCRYPTION_KEY);
 
+// Export convenience functions
+export const encrypt = (plaintext: string) => encryption.encrypt(plaintext);
+export const decrypt = (ciphertext: string) => encryption.decrypt(ciphertext);
+export const encryptObject = <T>(obj: T) => encryption.encryptObject(obj);
+export const decryptObject = <T>(ciphertext: string) => encryption.decryptObject<T>(ciphertext);
+
 // Export class for testing
 export { EncryptionUtil };
