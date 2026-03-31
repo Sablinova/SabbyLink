@@ -17,6 +17,8 @@ import { logger } from '@/utils/logger';
 import { authenticate } from '@/api/middleware/auth';
 import { rateLimiting } from '@/api/middleware/rate-limit';
 import { authRoutes } from '@/api/routes/auth';
+import { discordOAuthRoutes } from '@/api/routes/discord-oauth';
+import { userAppRoutes } from '@/api/routes/user-app';
 import { botRoutes } from '@/api/routes/bot';
 import { rpcRoutes } from '@/api/routes/rpc';
 import { commandsRoutes } from '@/api/routes/commands';
@@ -96,9 +98,11 @@ function createApp() {
     
     // Public auth routes (no middleware)
     .use(authRoutes)
+    .use(discordOAuthRoutes)
     
     // Protected routes (require authentication)
     .use(authenticate)
+    .use(userAppRoutes)
     .use(botRoutes)
     .use(rpcRoutes)
     .use(commandsRoutes)

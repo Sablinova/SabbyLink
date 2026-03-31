@@ -34,7 +34,13 @@ export async function initDatabase() {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         username TEXT NOT NULL UNIQUE,
         email TEXT NOT NULL UNIQUE,
-        password_hash TEXT NOT NULL,
+        password_hash TEXT,
+        discord_id TEXT UNIQUE,
+        discord_username TEXT,
+        discord_avatar TEXT,
+        discord_access_token TEXT,
+        discord_refresh_token TEXT,
+        discord_token_expires INTEGER,
         last_login INTEGER,
         created_at INTEGER NOT NULL DEFAULT (unixepoch()),
         updated_at INTEGER NOT NULL DEFAULT (unixepoch())
@@ -292,6 +298,34 @@ export async function initDatabase() {
         updated_at INTEGER NOT NULL DEFAULT (unixepoch())
       );
     `);
+
+    // Run migrations for new columns
+    console.log('📦 Running migrations...');
+    
+    // Add Discord OAuth columns to users table if they don't exist
+    const migrations = [
+      `ALTER TABLE users ADD COLUMN discord_id TEXT UNIQUE`,
+      `ALTER TABLE users ADD COLUMN discord_username TEXT`,
+      `ALTER TABLE users ADD COLUMN discord_avatar TEXT`,
+      `ALTER TABLE users ADD COLUMN discord_access_token TEXT`,
+      `ALTER TABLE users ADD COLUMN discord_refresh_token TEXT`,
+      `ALTER TABLE users ADD COLUMN discord_token_expires INTEGER`,
+    ];
+
+    for (const migration of migrations) {
+      try {
+        sqlite.exec(migration);
+      } catch (e: any) {
+        // Ignore "duplicate column" errors - column already exists
+        if (!e.message?.includes('duplicate column')) {
+          console.warn(`Migration warning: ${e.message}`);
+        }
+      }
+    }
+
+    // Make password_hash nullable for OAuth users
+    // SQLite doesn't support ALTER COLUMN, so we just allow NULL in new tables
+    // Existing tables will work since we handle NULL in code
 
     console.log('✅ Database tables created/verified');
     console.log(`   Location: ${env.DATABASE_URL}`);

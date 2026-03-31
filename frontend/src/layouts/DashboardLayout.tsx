@@ -16,6 +16,7 @@ import {
   Sun,
   Moon,
   Monitor,
+  AppWindow,
 } from 'lucide-react';
 
 interface DashboardLayoutProps {
@@ -25,6 +26,7 @@ interface DashboardLayoutProps {
 const navItems = [
   { path: '/dashboard', label: 'Dashboard', icon: Home },
   { path: '/bot', label: 'Bot', icon: Bot },
+  { path: '/user-app', label: 'User Apps', icon: AppWindow },
   { path: '/rpc', label: 'RPC', icon: Gamepad2 },
   { path: '/commands', label: 'Commands', icon: Terminal },
   { path: '/ai', label: 'AI', icon: Brain },

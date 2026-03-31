@@ -22,7 +22,14 @@ export const users = sqliteTable('users', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   username: text('username').notNull().unique(),
   email: text('email').notNull().unique(),
-  passwordHash: text('password_hash').notNull(),
+  passwordHash: text('password_hash'), // Nullable for OAuth-only users
+  // Discord OAuth fields
+  discordId: text('discord_id').unique(),
+  discordUsername: text('discord_username'),
+  discordAvatar: text('discord_avatar'),
+  discordAccessToken: text('discord_access_token'),
+  discordRefreshToken: text('discord_refresh_token'),
+  discordTokenExpires: integer('discord_token_expires', { mode: 'timestamp' }),
   lastLogin: integer('last_login', { mode: 'timestamp' }),
   ...timestamps,
 });

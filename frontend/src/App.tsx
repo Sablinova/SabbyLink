@@ -16,6 +16,7 @@ import RPCPage from './pages/RPCPage';
 import CommandsPage from './pages/CommandsPage';
 import AIPage from './pages/AIPage';
 import SettingsPage from './pages/SettingsPage';
+import UserAppPage from './pages/UserAppPage';
 
 // Protected route component
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -133,6 +134,16 @@ function App() {
             <ProtectedRoute>
               <DashboardLayout>
                 <SettingsPage />
+              </DashboardLayout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/user-app"
+          element={
+            <ProtectedRoute>
+              <DashboardLayout>
+                <UserAppPage />
               </DashboardLayout>
             </ProtectedRoute>
           }

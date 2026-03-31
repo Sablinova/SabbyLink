@@ -12,6 +12,14 @@ const envSchema = z.object({
   // Discord (optional - can be set via dashboard)
   DISCORD_TOKEN: z.string().optional(),
   
+  // Discord OAuth (for dashboard login)
+  DISCORD_CLIENT_ID: z.string().optional(),
+  DISCORD_CLIENT_SECRET: z.string().optional(),
+  DISCORD_REDIRECT_URI: z.string().url().optional(),
+  
+  // Bot Mode: 'selfbot' (user token) or 'bot' (bot token)
+  BOT_MODE: z.enum(['selfbot', 'bot']).default('selfbot'),
+  
   // Backend
   BACKEND_PORT: z.string().transform(Number).pipe(z.number().int().positive()).default('3000'),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('production'),
