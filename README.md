@@ -54,6 +54,14 @@
 - **Mobile-Optimized**: PWA support for phone/tablet control
 - **Dark/Light Themes**: Customizable appearance with presets
 - **Visual Automation Builder**: Drag-drop workflow creation without code
+- **Discord OAuth Login**: Sign in with your Discord account
+- **User App Manager**: Create and manage Discord Applications for slash commands
+
+### 🔀 Hybrid Bot Mode (Like Nighty)
+- **User Token (Selfbot)**: For presence, automation, message logging
+- **Application Token (User App)**: For legitimate Discord slash commands
+- **Best of Both Worlds**: Selfbot features + real slash command autocomplete
+- **Easy Setup**: Create Discord Apps directly from the dashboard
 
 ### 🛡️ Core Selfbot Features
 - **Slash Commands**: Custom commands with autocomplete
@@ -75,7 +83,9 @@
 ### 🔒 Security & Privacy
 - **AES-256-GCM Encryption**: All sensitive data encrypted at rest
 - **Local-First**: Your data never leaves your server
-- **Optional Discord OAuth**: Convenient login without storing passwords
+- **Discord OAuth Login**: Login with Discord instead of email/password
+- **Hybrid Bot Mode**: Combine selfbot actions with legitimate Discord slash commands
+- **User App Creation**: Create Discord Applications for real slash commands with autocomplete
 - **Rate Limiting**: Prevent API abuse and account flags
 - **Audit Logging**: Track all configuration changes
 
@@ -233,6 +243,9 @@ sabbylink/
 
 ### Phase 3: Advanced Features (Weeks 5-6) 🚧
 - [x] AI integration (5 providers: OpenAI, Claude, Gemini, Groq, Ollama)
+- [x] Discord OAuth login for dashboard
+- [x] Hybrid bot mode (selfbot + User App for slash commands)
+- [x] User App management UI
 - [ ] Visual automation builder
 - [x] Advanced RPC animations
 - [ ] Message logger and snipe

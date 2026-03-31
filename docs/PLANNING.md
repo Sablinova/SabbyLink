@@ -222,11 +222,13 @@ Optimization techniques:
 - **Description**: Modern slash commands with autocomplete
 - **User Story**: As a user, I want to execute commands with `/` prefix and see autocomplete suggestions
 - **Acceptance Criteria**:
-  - [ ] Commands registered with Discord gateway
-  - [ ] Autocomplete for command parameters
-  - [ ] Private mode (commands visible only to user)
-  - [ ] Command categories (admin, fun, utils, etc.)
+  - [x] Commands registered with Discord gateway
+  - [x] Autocomplete for command parameters
+  - [x] Private mode (commands visible only to user)
+  - [x] Command categories (admin, fun, utils, etc.)
+  - [x] **Hybrid Mode**: User App creation for legitimate Discord slash commands
 - **Priority**: P0 (Critical)
+- **Status**: ✅ Complete (including hybrid User App support)
 
 #### 3.1.2 Rich Presence Customizer
 - **Description**: Custom Discord RPC with platform emulation
@@ -685,9 +687,62 @@ POST /api/auth/logout
 Headers: Authorization: Bearer <token>
 Response: { success: true }
 
-POST /api/auth/discord-oauth
+# Discord OAuth (NEW - Implemented)
+GET /api/v1/auth/discord/url
+Response: { url: "https://discord.com/oauth2/authorize?..." }
+
+POST /api/v1/auth/discord/callback
 Body: { code }
 Response: { token, refreshToken, user }
+
+GET /api/v1/auth/discord/guilds
+Headers: Authorization: Bearer <token>
+Response: [{ id, name, icon, ... }]
+
+GET /api/v1/auth/discord/status
+Headers: Authorization: Bearer <token>
+Response: { linked: true, discordId: "...", discordUsername: "..." }
+
+DELETE /api/v1/auth/discord/unlink
+Headers: Authorization: Bearer <token>
+Response: { success: true }
+```
+
+#### User App Management (NEW - For Hybrid Bot Mode)
+
+```
+# List user's Discord applications
+GET /api/v1/user-app/list
+Headers: Authorization: Bearer <token>
+Response: [{ id, name, icon, ... }]
+
+# Create new Discord application for slash commands
+POST /api/v1/user-app/create
+Headers: Authorization: Bearer <token>
+Body: { name, description }
+Response: { id, name, token, ... }
+
+# Update application
+PATCH /api/v1/user-app/:appId
+Headers: Authorization: Bearer <token>
+Body: { name, description, icon }
+Response: { success: true }
+
+# Reset bot token
+POST /api/v1/user-app/:appId/reset-token
+Headers: Authorization: Bearer <token>
+Response: { token: "..." }
+
+# Get authorization URL for application
+GET /api/v1/user-app/:appId/auth-url
+Headers: Authorization: Bearer <token>
+Response: { url: "https://discord.com/oauth2/authorize?..." }
+
+# Register slash commands for application
+POST /api/v1/user-app/:appId/register-commands
+Headers: Authorization: Bearer <token>
+Body: { commands: [...] }
+Response: { success: true, registeredCount: 5 }
 ```
 
 #### Bot Control
@@ -1282,7 +1337,7 @@ const { connected, send } = useWebSocket(['bot.status', 'notifications'], {
 
 ### 9.2 Authentication Flow
 
-**Discord OAuth (Recommended):**
+**Discord OAuth (Recommended) - IMPLEMENTED:**
 ```
 1. User clicks "Login with Discord"
 2. Redirect to Discord OAuth consent page
@@ -1290,7 +1345,7 @@ const { connected, send } = useWebSocket(['bot.status', 'notifications'], {
 4. Discord redirects back with auth code
 5. Backend exchanges code for access token
 6. Fetch user info from Discord API
-7. Create user in database (if new)
+7. Create user in database (if new) or link to existing account
 8. Generate JWT access token (1h expiry)
 9. Generate refresh token (30 days)
 10. Store refresh token in database (hashed)
@@ -1298,7 +1353,14 @@ const { connected, send } = useWebSocket(['bot.status', 'notifications'], {
 12. Frontend stores access token in memory, refresh token in HTTP-only cookie
 ```
 
-**Traditional Email/Password:**
+**API Endpoints (Implemented):**
+- `GET /api/v1/auth/discord/url` - Get OAuth authorization URL
+- `POST /api/v1/auth/discord/callback` - Exchange code for tokens
+- `GET /api/v1/auth/discord/guilds` - Get user's Discord guilds
+- `GET /api/v1/auth/discord/status` - Check if Discord is linked
+- `DELETE /api/v1/auth/discord/unlink` - Unlink Discord from account
+
+**Traditional Email/Password (Also Supported):**
 ```
 1. User registers with email + password
 2. Hash password with bcrypt (cost factor: 12)

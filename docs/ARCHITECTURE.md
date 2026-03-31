@@ -994,6 +994,103 @@ export class WebSocketServer {
 
 ## Security Architecture
 
+### Discord OAuth & Hybrid Authentication
+
+SabbyLink supports a **hybrid authentication system** inspired by Nighty:
+
+1. **Discord OAuth for Dashboard Login** - Users can login with their Discord account instead of email/password
+2. **User App Creation** - Create Discord Applications for legitimate slash commands with autocomplete
+3. **Multiple Bot Modes**:
+   - **Selfbot Mode**: Uses user token for selfbot actions (presence, automation, message logging)
+   - **Bot Mode**: Uses application bot token for traditional bot commands
+   - **Hybrid Mode**: Combines both - user token for selfbot + application token for slash commands
+
+#### OAuth Flow Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    Discord OAuth Flow                            │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  1. User clicks "Login with Discord"                            │
+│           │                                                      │
+│           ▼                                                      │
+│  2. GET /api/v1/auth/discord/url                                │
+│           │                                                      │
+│           ▼                                                      │
+│  3. Redirect to Discord OAuth consent page                      │
+│           │                                                      │
+│           ▼                                                      │
+│  4. User authorizes app (identify, guilds scopes)               │
+│           │                                                      │
+│           ▼                                                      │
+│  5. Discord redirects with ?code=...                            │
+│           │                                                      │
+│           ▼                                                      │
+│  6. POST /api/v1/auth/discord/callback { code }                 │
+│           │                                                      │
+│           ▼                                                      │
+│  7. Backend exchanges code for Discord access token             │
+│           │                                                      │
+│           ▼                                                      │
+│  8. Fetch user info from Discord API                            │
+│           │                                                      │
+│           ▼                                                      │
+│  9. Create/update user in database with Discord ID              │
+│           │                                                      │
+│           ▼                                                      │
+│  10. Generate JWT + refresh token                               │
+│           │                                                      │
+│           ▼                                                      │
+│  11. Return tokens to frontend                                  │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+#### User App (Discord Application) Architecture
+
+The User App system allows creating Discord Applications through the Discord Developer Portal API:
+
+```typescript
+// Backend routes: backend/src/api/routes/user-app.ts
+
+// List user's applications
+GET /api/v1/user-app/list
+
+// Create new application (calls Discord API)
+POST /api/v1/user-app/create
+  - Creates application via Discord Developer Portal
+  - Stores application info in database
+  - Returns application ID and bot token
+
+// Register slash commands
+POST /api/v1/user-app/:appId/register-commands
+  - Registers commands with Discord
+  - Commands appear with autocomplete like regular bots
+```
+
+#### Database Schema Updates
+
+```sql
+-- Users table now supports OAuth-only accounts
+ALTER TABLE users ADD COLUMN discord_id TEXT UNIQUE;
+ALTER TABLE users ADD COLUMN discord_username TEXT;
+ALTER TABLE users ADD COLUMN discord_avatar TEXT;
+ALTER TABLE users ADD COLUMN discord_access_token TEXT;  -- Encrypted
+ALTER TABLE users ADD COLUMN discord_refresh_token TEXT; -- Encrypted
+ALTER TABLE users MODIFY password_hash TEXT NULL;  -- Nullable for OAuth-only users
+
+-- User applications table
+CREATE TABLE user_applications (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL REFERENCES users(id),
+  discord_app_id TEXT NOT NULL UNIQUE,
+  name TEXT NOT NULL,
+  bot_token TEXT,  -- Encrypted
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+```
+
 ### Encryption (AES-256-GCM)
 
 ```typescript
