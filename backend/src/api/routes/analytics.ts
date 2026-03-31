@@ -4,7 +4,7 @@ import { analyticsDaily, messageLogs, commandLogs } from '../../db/schema';
 import { eq, and, gte, lte, desc, count, sql } from 'drizzle-orm';
 import { logger } from '../../utils/logger';
 
-export const analyticsRoutes = new Elysia({ prefix: '/analytics' })
+export const analyticsRoutes = new Elysia({ prefix: '/api/v1/analytics' })
   .get('/overview', async ({ userId, set }) => {
     if (!userId) {
       set.status = 401;
@@ -15,24 +15,23 @@ export const analyticsRoutes = new Elysia({ prefix: '/analytics' })
       // Get today's analytics
       const today = new Date().toISOString().split('T')[0];
       
-      const todayStats = await db.query.analyticsDaily.findFirst({
-        where: and(
+      const todayResult = await db.select().from(analyticsDaily)
+        .where(and(
           eq(analyticsDaily.userId, userId),
           eq(analyticsDaily.date, today)
-        ),
-      });
+        ));
+      const todayStats = todayResult[0];
 
       // Get last 7 days
       const sevenDaysAgo = new Date();
       sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
       
-      const weekStats = await db.query.analyticsDaily.findMany({
-        where: and(
+      const weekStats = await db.select().from(analyticsDaily)
+        .where(and(
           eq(analyticsDaily.userId, userId),
           gte(analyticsDaily.date, sevenDaysAgo.toISOString().split('T')[0])
-        ),
-        orderBy: [desc(analyticsDaily.date)],
-      });
+        ))
+        .orderBy(desc(analyticsDaily.date));
 
       // Calculate totals for the week
       const weekTotals = weekStats.reduce(
@@ -70,33 +69,20 @@ export const analyticsRoutes = new Elysia({ prefix: '/analytics' })
     try {
       const { startDate, endDate, limit = '100' } = query;
 
-      let queryBuilder = db.query.messageLogs.findMany({
-        where: eq(messageLogs.userId, userId),
-        orderBy: [desc(messageLogs.createdAt)],
-        limit: parseInt(limit as string),
-      });
-
-      // Apply date filters if provided
-      // Note: Drizzle query builder is immutable, so we need to rebuild
-      if (startDate || endDate) {
-        const conditions = [eq(messageLogs.userId, userId)];
-        
-        if (startDate) {
-          conditions.push(gte(messageLogs.createdAt, new Date(startDate as string)));
-        }
-        
-        if (endDate) {
-          conditions.push(lte(messageLogs.createdAt, new Date(endDate as string)));
-        }
-
-        queryBuilder = db.query.messageLogs.findMany({
-          where: and(...conditions),
-          orderBy: [desc(messageLogs.createdAt)],
-          limit: parseInt(limit as string),
-        });
+      const conditions = [eq(messageLogs.userId, userId)];
+      
+      if (startDate) {
+        conditions.push(gte(messageLogs.createdAt, new Date(startDate as string)));
+      }
+      
+      if (endDate) {
+        conditions.push(lte(messageLogs.createdAt, new Date(endDate as string)));
       }
 
-      const messages = await queryBuilder;
+      const messages = await db.select().from(messageLogs)
+        .where(and(...conditions))
+        .orderBy(desc(messageLogs.createdAt))
+        .limit(parseInt(limit as string));
 
       return { messages };
     } catch (error) {
@@ -114,7 +100,7 @@ export const analyticsRoutes = new Elysia({ prefix: '/analytics' })
     try {
       const { startDate, endDate, limit = '100' } = query;
 
-      let conditions = [eq(commandLogs.userId, userId)];
+      const conditions = [eq(commandLogs.userId, userId)];
       
       if (startDate) {
         conditions.push(gte(commandLogs.createdAt, new Date(startDate as string)));
@@ -124,11 +110,10 @@ export const analyticsRoutes = new Elysia({ prefix: '/analytics' })
         conditions.push(lte(commandLogs.createdAt, new Date(endDate as string)));
       }
 
-      const commands = await db.query.commandLogs.findMany({
-        where: and(...conditions),
-        orderBy: [desc(commandLogs.createdAt)],
-        limit: parseInt(limit as string),
-      });
+      const commands = await db.select().from(commandLogs)
+        .where(and(...conditions))
+        .orderBy(desc(commandLogs.createdAt))
+        .limit(parseInt(limit as string));
 
       return { commands };
     } catch (error) {
@@ -148,13 +133,12 @@ export const analyticsRoutes = new Elysia({ prefix: '/analytics' })
       const daysAgo = new Date();
       daysAgo.setDate(daysAgo.getDate() - parseInt(days as string));
 
-      const dailyStats = await db.query.analyticsDaily.findMany({
-        where: and(
+      const dailyStats = await db.select().from(analyticsDaily)
+        .where(and(
           eq(analyticsDaily.userId, userId),
           gte(analyticsDaily.date, daysAgo.toISOString().split('T')[0])
-        ),
-        orderBy: [desc(analyticsDaily.date)],
-      });
+        ))
+        .orderBy(desc(analyticsDaily.date));
 
       // Calculate totals
       const totals = dailyStats.reduce(

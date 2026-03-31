@@ -1,25 +1,44 @@
 import { Elysia, t } from 'elysia';
+import { jwt } from '@elysiajs/jwt';
 import { db } from '../../db';
 import { users } from '../../db/schema';
 import { eq } from 'drizzle-orm';
 import { hash, compare } from 'bcrypt';
-import { sign } from 'jsonwebtoken';
+import { sign, verify } from 'jsonwebtoken';
 import { env } from '../../config/env';
 import { logger } from '../../utils/logger';
 
 const SALT_ROUNDS = 12;
 
-export const authRoutes = new Elysia({ prefix: '/auth' })
+// Helper to extract and verify JWT from Authorization header
+async function getUserIdFromToken(authHeader: string | undefined): Promise<number | null> {
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return null;
+  }
+  
+  const token = authHeader.substring(7);
+  
+  try {
+    const payload = verify(token, env.JWT_SECRET) as { userId: number };
+    return payload.userId;
+  } catch {
+    return null;
+  }
+}
+
+export const authRoutes = new Elysia({ prefix: '/api/v1/auth' })
   .post(
     '/register',
     async ({ body, set }) => {
       try {
         const { username, email, password } = body;
 
-        // Check if user exists
-        const existingUser = await db.query.users.findFirst({
-          where: eq(users.email, email),
-        });
+        // Check if user exists using select
+        const [existingUser] = await db
+          .select()
+          .from(users)
+          .where(eq(users.email, email))
+          .limit(1);
 
         if (existingUser) {
           set.status = 409;
@@ -77,10 +96,12 @@ export const authRoutes = new Elysia({ prefix: '/auth' })
       try {
         const { email, password } = body;
 
-        // Find user
-        const user = await db.query.users.findFirst({
-          where: eq(users.email, email),
-        });
+        // Find user using select instead of relational query
+        const [user] = await db
+          .select()
+          .from(users)
+          .where(eq(users.email, email))
+          .limit(1);
 
         if (!user) {
           set.status = 401;
@@ -131,16 +152,21 @@ export const authRoutes = new Elysia({ prefix: '/auth' })
       }),
     }
   )
-  .get('/me', async ({ userId, set }) => {
+  .get('/me', async ({ headers, set }) => {
+    // Manual auth check for this endpoint
+    const userId = await getUserIdFromToken(headers.authorization);
+    
     if (!userId) {
       set.status = 401;
       return { error: 'Unauthorized' };
     }
 
     try {
-      const user = await db.query.users.findFirst({
-        where: eq(users.id, userId),
-      });
+      const [user] = await db
+        .select()
+        .from(users)
+        .where(eq(users.id, userId))
+        .limit(1);
 
       if (!user) {
         set.status = 404;
@@ -160,7 +186,10 @@ export const authRoutes = new Elysia({ prefix: '/auth' })
       return { error: 'Failed to get user' };
     }
   })
-  .post('/logout', async ({ userId, set }) => {
+  .post('/logout', async ({ headers, set }) => {
+    // Manual auth check for this endpoint
+    const userId = await getUserIdFromToken(headers.authorization);
+    
     if (!userId) {
       set.status = 401;
       return { error: 'Unauthorized' };

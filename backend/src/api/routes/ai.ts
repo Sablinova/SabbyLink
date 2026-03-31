@@ -1,12 +1,12 @@
 import { Elysia, t } from 'elysia';
 import { db } from '../../db';
 import { aiConfigs, aiConversations, aiMessages } from '../../db/schema';
-import { eq, and, desc } from 'drizzle-orm';
+import { eq, and, desc, asc } from 'drizzle-orm';
 import { logger } from '../../utils/logger';
 import { aiManager } from '../../ai';
 import { encrypt, decrypt } from '../../utils/crypto';
 
-export const aiRoutes = new Elysia({ prefix: '/ai' })
+export const aiRoutes = new Elysia({ prefix: '/api/v1/ai' })
   .get('/providers', () => {
     const providers = aiManager.listProviders();
     return { providers };
@@ -18,10 +18,9 @@ export const aiRoutes = new Elysia({ prefix: '/ai' })
     }
 
     try {
-      const configs = await db.query.aiConfigs.findMany({
-        where: eq(aiConfigs.userId, userId),
-        orderBy: [desc(aiConfigs.createdAt)],
-      });
+      const configs = await db.select().from(aiConfigs)
+        .where(eq(aiConfigs.userId, userId))
+        .orderBy(desc(aiConfigs.createdAt));
 
       // Decrypt API keys for display (show only last 4 chars)
       const configsWithMaskedKeys = configs.map((config) => ({
@@ -99,9 +98,9 @@ export const aiRoutes = new Elysia({ prefix: '/ai' })
         const { configId, message, conversationId } = body;
 
         // Get AI config
-        const config = await db.query.aiConfigs.findFirst({
-          where: and(eq(aiConfigs.id, configId), eq(aiConfigs.userId, userId)),
-        });
+        const configResult = await db.select().from(aiConfigs)
+          .where(and(eq(aiConfigs.id, configId), eq(aiConfigs.userId, userId)));
+        const config = configResult[0];
 
         if (!config) {
           set.status = 404;
@@ -111,12 +110,12 @@ export const aiRoutes = new Elysia({ prefix: '/ai' })
         // Get or create conversation
         let conversation;
         if (conversationId) {
-          conversation = await db.query.aiConversations.findFirst({
-            where: and(
+          const convResult = await db.select().from(aiConversations)
+            .where(and(
               eq(aiConversations.id, conversationId),
               eq(aiConversations.userId, userId)
-            ),
-          });
+            ));
+          conversation = convResult[0];
         }
 
         if (!conversation) {
@@ -132,18 +131,17 @@ export const aiRoutes = new Elysia({ prefix: '/ai' })
         }
 
         // Get conversation history
-        const history = await db.query.aiMessages.findMany({
-          where: eq(aiMessages.conversationId, conversation.id),
-          orderBy: [desc(aiMessages.createdAt)],
-          limit: 20,
-        });
+        const history = await db.select().from(aiMessages)
+          .where(eq(aiMessages.conversationId, conversation.id))
+          .orderBy(asc(aiMessages.createdAt))
+          .limit(20);
 
         // Build messages array
         const messages = [
           ...(config.systemPrompt
             ? [{ role: 'system' as const, content: config.systemPrompt }]
             : []),
-          ...history.reverse().map((msg) => ({
+          ...history.map((msg) => ({
             role: msg.role as 'user' | 'assistant',
             content: msg.content,
           })),
@@ -212,16 +210,21 @@ export const aiRoutes = new Elysia({ prefix: '/ai' })
     }
 
     try {
-      const conversations = await db.query.aiConversations.findMany({
-        where: eq(aiConversations.userId, userId),
-        orderBy: [desc(aiConversations.lastMessageAt)],
-        limit: 50,
-        with: {
-          aiConfig: true,
-        },
-      });
+      const conversations = await db.select().from(aiConversations)
+        .where(eq(aiConversations.userId, userId))
+        .orderBy(desc(aiConversations.lastMessageAt))
+        .limit(50);
 
-      return { conversations };
+      // Get config info for each conversation
+      const conversationsWithConfig = await Promise.all(
+        conversations.map(async (conv) => {
+          const configResult = await db.select().from(aiConfigs)
+            .where(eq(aiConfigs.id, conv.aiConfigId));
+          return { ...conv, aiConfig: configResult[0] || null };
+        })
+      );
+
+      return { conversations: conversationsWithConfig };
     } catch (error) {
       logger.error('Get conversations error:', error);
       set.status = 500;
@@ -237,29 +240,31 @@ export const aiRoutes = new Elysia({ prefix: '/ai' })
     try {
       const conversationId = parseInt(params.id);
 
-      const conversation = await db.query.aiConversations.findFirst({
-        where: and(
+      const conversationResult = await db.select().from(aiConversations)
+        .where(and(
           eq(aiConversations.id, conversationId),
           eq(aiConversations.userId, userId)
-        ),
-        with: {
-          aiConfig: true,
-        },
-      });
+        ));
+      
+      const conversation = conversationResult[0];
 
       if (!conversation) {
         set.status = 404;
         return { error: 'Conversation not found' };
       }
 
-      const messages = await db.query.aiMessages.findMany({
-        where: eq(aiMessages.conversationId, conversationId),
-        orderBy: [desc(aiMessages.createdAt)],
-      });
+      // Get config
+      const configResult = await db.select().from(aiConfigs)
+        .where(eq(aiConfigs.id, conversation.aiConfigId));
+      const aiConfig = configResult[0] || null;
+
+      const messages = await db.select().from(aiMessages)
+        .where(eq(aiMessages.conversationId, conversationId))
+        .orderBy(asc(aiMessages.createdAt));
 
       return {
-        conversation,
-        messages: messages.reverse(),
+        conversation: { ...conversation, aiConfig },
+        messages,
       };
     } catch (error) {
       logger.error('Get conversation error:', error);

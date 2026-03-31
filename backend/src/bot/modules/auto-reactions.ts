@@ -43,9 +43,8 @@ export class AutoReactionsModule {
 
   private async loadRules(): Promise<void> {
     try {
-      const rules = await db.query.autoReactions.findMany({
-        where: eq(autoReactions.discordAccountId, this.discordAccountId),
-      });
+      const rules = await db.select().from(autoReactions)
+        .where(eq(autoReactions.discordAccountId, this.discordAccountId));
 
       this.rules = rules.map(r => ({
         id: r.id,

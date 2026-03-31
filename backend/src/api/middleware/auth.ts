@@ -61,10 +61,12 @@ export const authenticate = (app: Elysia) =>
           throw new Error('Unauthorized: Invalid token');
         }
 
-        // Load user from database
-        const user = await db.query.users.findFirst({
-          where: eq(users.id, payload.userId),
-        });
+        // Load user from database using select (not relational query)
+        const [user] = await db
+          .select()
+          .from(users)
+          .where(eq(users.id, payload.userId))
+          .limit(1);
 
         if (!user) {
           set.status = 401;
@@ -110,9 +112,12 @@ export const optionalAuth = (app: Elysia) =>
           };
         }
 
-        const user = await db.query.users.findFirst({
-          where: eq(users.id, payload.userId),
-        });
+        // Load user from database using select (not relational query)
+        const [user] = await db
+          .select()
+          .from(users)
+          .where(eq(users.id, payload.userId))
+          .limit(1);
 
         return {
           user: user || null,

@@ -1,11 +1,11 @@
 import { Elysia, t } from 'elysia';
 import { db } from '../../db';
 import { rpcConfigs, rpcStates } from '../../db/schema';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, desc, asc } from 'drizzle-orm';
 import { logger } from '../../utils/logger';
 import { rpcManager } from '../../bot/rpc';
 
-export const rpcRoutes = new Elysia({ prefix: '/rpc' })
+export const rpcRoutes = new Elysia({ prefix: '/api/v1/rpc' })
   .get('/configs', async ({ userId, set }) => {
     if (!userId) {
       set.status = 401;
@@ -13,13 +13,18 @@ export const rpcRoutes = new Elysia({ prefix: '/rpc' })
     }
 
     try {
-      const configs = await db.query.rpcConfigs.findMany({
-        where: eq(rpcConfigs.userId, userId),
-        with: {
-          states: true,
-        },
-        orderBy: (configs, { desc }) => [desc(configs.createdAt)],
-      });
+      const configsList = await db.select().from(rpcConfigs)
+        .where(eq(rpcConfigs.userId, userId))
+        .orderBy(desc(rpcConfigs.createdAt));
+      
+      // Get states for each config
+      const configs = await Promise.all(
+        configsList.map(async (config) => {
+          const states = await db.select().from(rpcStates)
+            .where(eq(rpcStates.configId, config.id));
+          return { ...config, states };
+        })
+      );
 
       return { configs };
     } catch (error) {
@@ -35,24 +40,25 @@ export const rpcRoutes = new Elysia({ prefix: '/rpc' })
     }
 
     try {
-      const config = await db.query.rpcConfigs.findFirst({
-        where: and(
+      const configResult = await db.select().from(rpcConfigs)
+        .where(and(
           eq(rpcConfigs.id, parseInt(params.id)),
           eq(rpcConfigs.userId, userId)
-        ),
-        with: {
-          states: {
-            orderBy: (states, { asc }) => [asc(states.order)],
-          },
-        },
-      });
+        ));
+      
+      const config = configResult[0];
 
       if (!config) {
         set.status = 404;
         return { error: 'RPC config not found' };
       }
 
-      return { config };
+      // Get states
+      const states = await db.select().from(rpcStates)
+        .where(eq(rpcStates.configId, config.id))
+        .orderBy(asc(rpcStates.order));
+
+      return { config: { ...config, states } };
     } catch (error) {
       logger.error('Get RPC config error:', error);
       set.status = 500;
@@ -84,7 +90,7 @@ export const rpcRoutes = new Elysia({ prefix: '/rpc' })
         // Create states
         if (statesData && statesData.length > 0) {
           const statesValues = statesData.map((state, index) => ({
-            rpcConfigId: config.id,
+            configId: config.id,
             order: index,
             details: state.details,
             state: state.state,
@@ -106,14 +112,10 @@ export const rpcRoutes = new Elysia({ prefix: '/rpc' })
         logger.info(`RPC config created: ${config.id} for user: ${userId}`);
 
         // Fetch the complete config with states
-        const completeConfig = await db.query.rpcConfigs.findFirst({
-          where: eq(rpcConfigs.id, config.id),
-          with: {
-            states: {
-              orderBy: (states, { asc }) => [asc(states.order)],
-            },
-          },
-        });
+        const states = await db.select().from(rpcStates)
+          .where(eq(rpcStates.configId, config.id))
+          .orderBy(asc(rpcStates.order));
+        const completeConfig = { ...config, states };
 
         return { config: completeConfig };
       } catch (error) {
@@ -192,11 +194,11 @@ export const rpcRoutes = new Elysia({ prefix: '/rpc' })
         }
 
         // Delete old states and create new ones
-        await db.delete(rpcStates).where(eq(rpcStates.rpcConfigId, configId));
+        await db.delete(rpcStates).where(eq(rpcStates.configId, configId));
 
         if (statesData && statesData.length > 0) {
           const statesValues = statesData.map((state, index) => ({
-            rpcConfigId: config.id,
+            configId: config.id,
             order: index,
             details: state.details,
             state: state.state,
@@ -223,14 +225,10 @@ export const rpcRoutes = new Elysia({ prefix: '/rpc' })
         logger.info(`RPC config updated: ${config.id}`);
 
         // Fetch the complete config with states
-        const completeConfig = await db.query.rpcConfigs.findFirst({
-          where: eq(rpcConfigs.id, config.id),
-          with: {
-            states: {
-              orderBy: (states, { asc }) => [asc(states.order)],
-            },
-          },
-        });
+        const updatedStates = await db.select().from(rpcStates)
+          .where(eq(rpcStates.configId, config.id))
+          .orderBy(asc(rpcStates.order));
+        const completeConfig = { ...config, states: updatedStates };
 
         return { config: completeConfig };
       } catch (error) {
@@ -287,7 +285,7 @@ export const rpcRoutes = new Elysia({ prefix: '/rpc' })
       const configId = parseInt(params.id);
 
       // Delete states first (cascade)
-      await db.delete(rpcStates).where(eq(rpcStates.rpcConfigId, configId));
+      await db.delete(rpcStates).where(eq(rpcStates.configId, configId));
 
       // Delete config
       const result = await db
@@ -319,12 +317,13 @@ export const rpcRoutes = new Elysia({ prefix: '/rpc' })
     try {
       const configId = parseInt(params.id);
 
-      const config = await db.query.rpcConfigs.findFirst({
-        where: and(
+      const configResult = await db.select().from(rpcConfigs)
+        .where(and(
           eq(rpcConfigs.id, configId),
           eq(rpcConfigs.userId, userId)
-        ),
-      });
+        ));
+      
+      const config = configResult[0];
 
       if (!config) {
         set.status = 404;

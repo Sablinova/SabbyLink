@@ -1,10 +1,10 @@
 import { Elysia, t } from 'elysia';
 import { db } from '../../db';
-import { settings, users } from '../../db/schema';
+import { settings, users, discordAccounts, rpcConfigs, rpcStates, slashCommands } from '../../db/schema';
 import { eq } from 'drizzle-orm';
 import { logger } from '../../utils/logger';
 
-export const settingsRoutes = new Elysia({ prefix: '/settings' })
+export const settingsRoutes = new Elysia({ prefix: '/api/v1/settings' })
   .get('/', async ({ userId, set }) => {
     if (!userId) {
       set.status = 401;
@@ -12,9 +12,9 @@ export const settingsRoutes = new Elysia({ prefix: '/settings' })
     }
 
     try {
-      const userSettings = await db.query.settings.findFirst({
-        where: eq(settings.userId, userId),
-      });
+      const settingsResult = await db.select().from(settings)
+        .where(eq(settings.userId, userId));
+      const userSettings = settingsResult[0];
 
       if (!userSettings) {
         // Create default settings
@@ -99,26 +99,31 @@ export const settingsRoutes = new Elysia({ prefix: '/settings' })
 
     try {
       // Get all user data
-      const user = await db.query.users.findFirst({
-        where: eq(users.id, userId),
-      });
+      const userResult = await db.select().from(users).where(eq(users.id, userId));
+      const user = userResult[0];
 
-      const userSettings = await db.query.settings.findFirst({
-        where: eq(settings.userId, userId),
-      });
+      const settingsResult = await db.select().from(settings)
+        .where(eq(settings.userId, userId));
+      const userSettings = settingsResult[0];
 
-      const discordAccount = await db.query.discordAccounts.findFirst({
-        where: eq(db.schema.discordAccounts.userId, userId),
-      });
+      const discordAccountResult = await db.select().from(discordAccounts)
+        .where(eq(discordAccounts.userId, userId));
+      const discordAccount = discordAccountResult[0];
 
-      const rpcConfigs = await db.query.rpcConfigs.findMany({
-        where: eq(db.schema.rpcConfigs.userId, userId),
-        with: { states: true },
-      });
+      const rpcConfigsList = await db.select().from(rpcConfigs)
+        .where(eq(rpcConfigs.userId, userId));
+      
+      // Get states for each config
+      const rpcConfigsWithStates = await Promise.all(
+        rpcConfigsList.map(async (config) => {
+          const states = await db.select().from(rpcStates)
+            .where(eq(rpcStates.configId, config.id));
+          return { ...config, states };
+        })
+      );
 
-      const commands = await db.query.slashCommands.findMany({
-        where: eq(db.schema.slashCommands.userId, userId),
-      });
+      const commands = await db.select().from(slashCommands)
+        .where(eq(slashCommands.userId, userId));
 
       const backup = {
         version: '1.0.0',
@@ -135,7 +140,7 @@ export const settingsRoutes = new Elysia({ prefix: '/settings' })
               discriminator: discordAccount.discriminator,
             }
           : null,
-        rpcConfigs,
+        rpcConfigs: rpcConfigsWithStates,
         commands,
       };
 
@@ -179,13 +184,13 @@ export const settingsRoutes = new Elysia({ prefix: '/settings' })
         if (backup.rpcConfigs && Array.isArray(backup.rpcConfigs)) {
           // Delete existing configs
           await db
-            .delete(db.schema.rpcConfigs)
-            .where(eq(db.schema.rpcConfigs.userId, userId));
+            .delete(rpcConfigs)
+            .where(eq(rpcConfigs.userId, userId));
 
           // Insert restored configs
           for (const config of backup.rpcConfigs) {
             const [newConfig] = await db
-              .insert(db.schema.rpcConfigs)
+              .insert(rpcConfigs)
               .values({
                 userId,
                 name: config.name,
@@ -197,9 +202,10 @@ export const settingsRoutes = new Elysia({ prefix: '/settings' })
             // Insert states
             if (config.states && Array.isArray(config.states)) {
               for (const state of config.states) {
-                await db.insert(db.schema.rpcStates).values({
-                  rpcConfigId: newConfig.id,
+                await db.insert(rpcStates).values({
+                  configId: newConfig.id,
                   order: state.order,
+                  name: state.name || 'Unnamed State',
                   details: state.details,
                   state: state.state,
                   largeImageKey: state.largeImageKey,
@@ -222,12 +228,12 @@ export const settingsRoutes = new Elysia({ prefix: '/settings' })
         if (backup.commands && Array.isArray(backup.commands)) {
           // Delete existing commands
           await db
-            .delete(db.schema.slashCommands)
-            .where(eq(db.schema.slashCommands.userId, userId));
+            .delete(slashCommands)
+            .where(eq(slashCommands.userId, userId));
 
           // Insert restored commands
           for (const command of backup.commands) {
-            await db.insert(db.schema.slashCommands).values({
+            await db.insert(slashCommands).values({
               userId,
               name: command.name,
               description: command.description,

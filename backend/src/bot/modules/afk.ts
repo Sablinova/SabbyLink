@@ -40,9 +40,10 @@ export class AFKModule {
 
   private async loadSettings(): Promise<void> {
     try {
-      const settings = await db.query.afkSettings.findFirst({
-        where: eq(afkSettings.discordAccountId, this.discordAccountId),
-      });
+      const settingsResult = await db.select().from(afkSettings)
+        .where(eq(afkSettings.discordAccountId, this.discordAccountId));
+      
+      const settings = settingsResult[0];
 
       if (settings && settings.enabled) {
         this.state = {

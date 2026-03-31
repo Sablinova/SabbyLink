@@ -87,9 +87,10 @@ export class GiveawayJoinerModule {
 
   private async loadSettings(): Promise<void> {
     try {
-      const settings = await db.query.giveawayJoiners.findFirst({
-        where: eq(giveawayJoiners.discordAccountId, this.discordAccountId),
-      });
+      const settingsResult = await db.select().from(giveawayJoiners)
+        .where(eq(giveawayJoiners.discordAccountId, this.discordAccountId));
+      
+      const settings = settingsResult[0];
 
       if (settings) {
         this.settings = {

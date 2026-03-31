@@ -192,15 +192,14 @@ class BotManager extends EventEmitter {
   // Auto-start bots on server startup
   async autoStart() {
     try {
-      const accounts = await db.query.discordAccounts.findMany({
-        where: eq(discordAccounts.isActive, true),
-      });
+      // Get all discord accounts (no isActive field in schema - all accounts are active)
+      const accounts = await db.select().from(discordAccounts);
 
       logger.info(`Auto-starting ${accounts.length} bots...`);
 
       for (const account of accounts) {
         try {
-          const token = decrypt(account.token);
+          const token = decrypt(account.tokenEncrypted);
           await this.start(account.userId, token);
         } catch (error) {
           logger.error(

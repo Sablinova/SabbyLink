@@ -1,7 +1,7 @@
 import { botManager } from './index';
 import { db } from '../db';
 import { rpcConfigs, rpcStates } from '../db/schema';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, asc } from 'drizzle-orm';
 import { logger } from '../utils/logger';
 import { RichPresence } from 'discord.js-selfbot-v13';
 
@@ -28,17 +28,23 @@ class RPCManager {
 
   async start(userId: number): Promise<void> {
     // Get enabled RPC config
-    const config = await db.query.rpcConfigs.findFirst({
-      where: and(eq(rpcConfigs.userId, userId), eq(rpcConfigs.enabled, true)),
-      with: {
-        states: {
-          orderBy: (states, { asc }) => [asc(states.order)],
-        },
-      },
-    });
+    const configs = await db.select().from(rpcConfigs)
+      .where(and(eq(rpcConfigs.userId, userId), eq(rpcConfigs.enabled, true)));
+    
+    const config = configs[0];
 
-    if (!config || !config.states || config.states.length === 0) {
+    if (!config) {
       logger.debug(`No enabled RPC config for user: ${userId}`);
+      return;
+    }
+
+    // Get states for this config
+    const states = await db.select().from(rpcStates)
+      .where(eq(rpcStates.configId, config.id))
+      .orderBy(asc(rpcStates.order));
+
+    if (states.length === 0) {
+      logger.debug(`No RPC states for user: ${userId}`);
       return;
     }
 
@@ -55,7 +61,7 @@ class RPCManager {
       userId,
       configId: config.id,
       currentStateIndex: 0,
-      states: config.states,
+      states: states,
     };
 
     this.activeRPCs.set(userId, rpcState);
@@ -64,8 +70,8 @@ class RPCManager {
     await this.updatePresence(userId);
 
     // If multiple states, setup rotation
-    if (config.states.length > 1) {
-      const firstDuration = config.states[0].duration || 60;
+    if (states.length > 1) {
+      const firstDuration = states[0].duration || 60;
       rpcState.intervalId = setInterval(() => {
         this.rotateState(userId);
       }, firstDuration * 1000);
@@ -131,10 +137,10 @@ class RPCManager {
     const client = botManager.getClient(userId);
     if (!client || !client.user) return;
 
-    const config = await db.query.rpcConfigs.findFirst({
-      where: eq(rpcConfigs.id, rpcState.configId),
-    });
+    const configs = await db.select().from(rpcConfigs)
+      .where(eq(rpcConfigs.id, rpcState.configId));
 
+    const config = configs[0];
     if (!config) return;
 
     const state = rpcState.states[rpcState.currentStateIndex];
@@ -242,9 +248,7 @@ class RPCManager {
   // Auto-start RPCs for active bots
   async autoStart() {
     try {
-      const configs = await db.query.rpcConfigs.findMany({
-        where: eq(rpcConfigs.enabled, true),
-      });
+      const configs = await db.select().from(rpcConfigs).where(eq(rpcConfigs.enabled, true));
 
       logger.info(`Auto-starting ${configs.length} RPCs...`);
 

@@ -1,11 +1,11 @@
 import { Elysia, t } from 'elysia';
 import { db } from '../../db';
 import { slashCommands } from '../../db/schema';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, asc, isNull } from 'drizzle-orm';
 import { logger } from '../../utils/logger';
 import { botManager } from '../../bot';
 
-export const commandsRoutes = new Elysia({ prefix: '/commands' })
+export const commandsRoutes = new Elysia({ prefix: '/api/v1/commands' })
   .get('/list', async ({ userId, set }) => {
     if (!userId) {
       set.status = 401;
@@ -13,10 +13,9 @@ export const commandsRoutes = new Elysia({ prefix: '/commands' })
     }
 
     try {
-      const commands = await db.query.slashCommands.findMany({
-        where: eq(slashCommands.userId, userId),
-        orderBy: (commands, { asc }) => [asc(commands.name)],
-      });
+      const commands = await db.select().from(slashCommands)
+        .where(eq(slashCommands.userId, userId))
+        .orderBy(asc(slashCommands.name));
 
       return { commands };
     } catch (error) {
@@ -32,12 +31,13 @@ export const commandsRoutes = new Elysia({ prefix: '/commands' })
     }
 
     try {
-      const command = await db.query.slashCommands.findFirst({
-        where: and(
+      const commandResult = await db.select().from(slashCommands)
+        .where(and(
           eq(slashCommands.id, parseInt(params.id)),
           eq(slashCommands.userId, userId)
-        ),
-      });
+        ));
+      
+      const command = commandResult[0];
 
       if (!command) {
         set.status = 404;
@@ -63,13 +63,20 @@ export const commandsRoutes = new Elysia({ prefix: '/commands' })
         const { name, description, response, guildId, enabled } = body;
 
         // Check if command with same name exists for this user
-        const existing = await db.query.slashCommands.findFirst({
-          where: and(
-            eq(slashCommands.userId, userId),
-            eq(slashCommands.name, name),
-            guildId ? eq(slashCommands.guildId, guildId) : undefined
-          ),
-        });
+        const existingConditions = [
+          eq(slashCommands.userId, userId),
+          eq(slashCommands.name, name),
+        ];
+        if (guildId) {
+          existingConditions.push(eq(slashCommands.guildId, guildId));
+        } else {
+          existingConditions.push(isNull(slashCommands.guildId));
+        }
+        
+        const existingResult = await db.select().from(slashCommands)
+          .where(and(...existingConditions));
+        
+        const existing = existingResult[0];
 
         if (existing) {
           set.status = 409;
@@ -214,12 +221,13 @@ export const commandsRoutes = new Elysia({ prefix: '/commands' })
     try {
       const commandId = parseInt(params.id);
 
-      const command = await db.query.slashCommands.findFirst({
-        where: and(
+      const commandResult = await db.select().from(slashCommands)
+        .where(and(
           eq(slashCommands.id, commandId),
           eq(slashCommands.userId, userId)
-        ),
-      });
+        ));
+      
+      const command = commandResult[0];
 
       if (!command) {
         set.status = 404;

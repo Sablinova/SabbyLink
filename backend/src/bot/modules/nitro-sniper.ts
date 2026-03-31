@@ -60,9 +60,10 @@ export class NitroSniperModule {
 
   private async loadSettings(): Promise<void> {
     try {
-      const settings = await db.query.nitroSnipers.findFirst({
-        where: eq(nitroSnipers.discordAccountId, this.discordAccountId),
-      });
+      const settingsResult = await db.select().from(nitroSnipers)
+        .where(eq(nitroSnipers.discordAccountId, this.discordAccountId));
+      
+      const settings = settingsResult[0];
 
       if (settings) {
         this.settings = {

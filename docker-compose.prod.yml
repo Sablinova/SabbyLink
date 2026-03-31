@@ -12,8 +12,8 @@ services:
     container_name: sabbylink-backend
     restart: unless-stopped
     ports:
-      # Expose backend API for NPM proxy
-      - "127.0.0.1:3100:3000"
+      # Expose backend API for NPM proxy (0.0.0.0 for Docker network access)
+      - "0.0.0.0:3100:3000"
     environment:
       # Discord
       - DISCORD_TOKEN=${DISCORD_TOKEN}
@@ -96,13 +96,13 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        - VITE_API_URL=https://sabbylink.2b.sablinova.com/api
+        - VITE_API_URL=https://sabbylink.2b.sablinova.com/api/v1
         - VITE_WS_URL=wss://sabbylink.2b.sablinova.com/ws
     container_name: sabbylink-frontend
     restart: unless-stopped
     ports:
-      # Expose frontend for NPM proxy
-      - "127.0.0.1:3101:80"
+      # Expose frontend for NPM proxy (0.0.0.0 for Docker network access)
+      - "0.0.0.0:3101:80"
     depends_on:
       backend:
         condition: service_healthy

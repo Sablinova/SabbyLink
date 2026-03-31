@@ -6,7 +6,7 @@ import { logger } from '../../utils/logger';
 import { encrypt, decrypt } from '../../utils/crypto';
 import { botManager } from '../../bot';
 
-export const botRoutes = new Elysia({ prefix: '/bot' })
+export const botRoutes = new Elysia({ prefix: '/api/v1/bot' })
   .get('/status', async ({ userId, set }) => {
     if (!userId) {
       set.status = 401;
@@ -36,28 +36,40 @@ export const botRoutes = new Elysia({ prefix: '/bot' })
         // Encrypt and store token
         const encryptedToken = encrypt(token);
         
-        const [account] = await db
-          .insert(discordAccounts)
-          .values({
-            userId,
-            token: encryptedToken,
-            isActive: true,
-          })
-          .onConflictDoUpdate({
-            target: discordAccounts.userId,
-            set: {
-              token: encryptedToken,
-              isActive: true,
-              updatedAt: new Date(),
-            },
-          })
-          .returning();
+        // Note: Schema requires discordId, username, discriminator - we'll get them from Discord
+        // For now, just start the bot and update the account when we get user info
+        const client = await botManager.start(userId, token);
+        
+        // Get user info from Discord
+        const discordUser = botManager.getUser(userId);
+        
+        if (discordUser) {
+          const [account] = await db
+            .insert(discordAccounts)
+            .values({
+              userId,
+              discordId: discordUser.id,
+              username: discordUser.username,
+              discriminator: discordUser.discriminator || '0',
+              tokenEncrypted: encryptedToken,
+            })
+            .onConflictDoUpdate({
+              target: discordAccounts.userId,
+              set: {
+                tokenEncrypted: encryptedToken,
+                username: discordUser.username,
+                discriminator: discordUser.discriminator || '0',
+                updatedAt: new Date(),
+              },
+            })
+            .returning();
 
-        // Start bot
-        await botManager.start(userId, token);
+          logger.info(`Bot started for user: ${userId}`);
+          return { message: 'Bot started successfully', accountId: account.id };
+        }
 
         logger.info(`Bot started for user: ${userId}`);
-        return { message: 'Bot started successfully', accountId: account.id };
+        return { message: 'Bot started successfully' };
       } catch (error) {
         logger.error('Start bot error:', error);
         set.status = 500;
@@ -79,12 +91,6 @@ export const botRoutes = new Elysia({ prefix: '/bot' })
     try {
       await botManager.stop(userId);
 
-      // Mark account as inactive
-      await db
-        .update(discordAccounts)
-        .set({ isActive: false, updatedAt: new Date() })
-        .where(eq(discordAccounts.userId, userId));
-
       logger.info(`Bot stopped for user: ${userId}`);
       return { message: 'Bot stopped successfully' };
     } catch (error) {
@@ -101,16 +107,17 @@ export const botRoutes = new Elysia({ prefix: '/bot' })
 
     try {
       // Get stored token
-      const account = await db.query.discordAccounts.findFirst({
-        where: eq(discordAccounts.userId, userId),
-      });
+      const accountResult = await db.select().from(discordAccounts)
+        .where(eq(discordAccounts.userId, userId));
+      
+      const account = accountResult[0];
 
       if (!account) {
         set.status = 404;
         return { error: 'Discord account not configured' };
       }
 
-      const token = decrypt(account.token);
+      const token = decrypt(account.tokenEncrypted);
 
       // Restart bot
       await botManager.stop(userId);
