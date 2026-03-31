@@ -297,6 +297,19 @@ export async function initDatabase() {
         created_at INTEGER NOT NULL DEFAULT (unixepoch()),
         updated_at INTEGER NOT NULL DEFAULT (unixepoch())
       );
+
+      -- System settings table (for dashboard-configurable app settings)
+      CREATE TABLE IF NOT EXISTS system_settings (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        key TEXT NOT NULL UNIQUE,
+        value TEXT NOT NULL,
+        encrypted INTEGER NOT NULL DEFAULT 0,
+        category TEXT NOT NULL DEFAULT 'general',
+        created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+        updated_at INTEGER NOT NULL DEFAULT (unixepoch())
+      );
+      CREATE INDEX IF NOT EXISTS system_settings_key_idx ON system_settings(key);
+      CREATE INDEX IF NOT EXISTS system_settings_category_idx ON system_settings(category);
     `);
 
     // Run migrations for new columns

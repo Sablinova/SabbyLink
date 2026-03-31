@@ -7,15 +7,26 @@
 
 import { z } from 'zod';
 
+// Helper to convert empty strings to undefined for optional fields
+const optionalString = z.preprocess(
+  (val) => (val === '' ? undefined : val),
+  z.string().optional()
+);
+
+const optionalUrl = z.preprocess(
+  (val) => (val === '' ? undefined : val),
+  z.string().url().optional()
+);
+
 // Environment schema with validation
 const envSchema = z.object({
   // Discord (optional - can be set via dashboard)
-  DISCORD_TOKEN: z.string().optional(),
+  DISCORD_TOKEN: optionalString,
   
   // Discord OAuth (for dashboard login)
-  DISCORD_CLIENT_ID: z.string().optional(),
-  DISCORD_CLIENT_SECRET: z.string().optional(),
-  DISCORD_REDIRECT_URI: z.string().url().optional(),
+  DISCORD_CLIENT_ID: optionalString,
+  DISCORD_CLIENT_SECRET: optionalString,
+  DISCORD_REDIRECT_URI: optionalUrl,
   
   // Bot Mode: 'selfbot' (user token) or 'bot' (bot token)
   BOT_MODE: z.enum(['selfbot', 'bot']).default('selfbot'),
@@ -35,23 +46,23 @@ const envSchema = z.object({
   LOG_LEVEL: z.enum(['error', 'warn', 'info', 'debug']).default('info'),
   
   // AI Providers (all optional)
-  OPENAI_API_KEY: z.string().optional(),
+  OPENAI_API_KEY: optionalString,
   OPENAI_MODEL: z.string().default('gpt-4-turbo-preview'),
-  ANTHROPIC_API_KEY: z.string().optional(),
+  ANTHROPIC_API_KEY: optionalString,
   ANTHROPIC_MODEL: z.string().default('claude-3-sonnet-20240229'),
-  GOOGLE_AI_API_KEY: z.string().optional(),
+  GOOGLE_AI_API_KEY: optionalString,
   GOOGLE_AI_MODEL: z.string().default('gemini-pro'),
-  GROQ_API_KEY: z.string().optional(),
+  GROQ_API_KEY: optionalString,
   GROQ_MODEL: z.string().default('mixtral-8x7b-32768'),
   OLLAMA_BASE_URL: z.string().url().default('http://localhost:11434'),
   OLLAMA_MODEL: z.string().default('llama2'),
-  OPENROUTER_API_KEY: z.string().optional(),
+  OPENROUTER_API_KEY: optionalString,
   OPENROUTER_MODEL: z.string().default('anthropic/claude-3-opus'),
-  PERPLEXITY_API_KEY: z.string().optional(),
+  PERPLEXITY_API_KEY: optionalString,
   PERPLEXITY_MODEL: z.string().default('pplx-70b-online'),
-  CUSTOM_AI_URL: z.string().url().optional(),
-  CUSTOM_AI_API_KEY: z.string().optional(),
-  CUSTOM_AI_MODEL: z.string().optional(),
+  CUSTOM_AI_URL: optionalUrl,
+  CUSTOM_AI_API_KEY: optionalString,
+  CUSTOM_AI_MODEL: optionalString,
   DEFAULT_AI_PROVIDER: z.enum([
     'openai', 
     'anthropic', 

@@ -98,6 +98,10 @@ services:
     networks:
       - sabbylink-network
     
+    # Expose port to host for NPM reverse proxy
+    ports:
+      - "3100:3000"
+    
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/api/v1/health"]
       interval: 30s
@@ -130,6 +134,10 @@ services:
         condition: service_healthy
     networks:
       - sabbylink-network
+    
+    # Expose port to host for NPM reverse proxy
+    ports:
+      - "3101:80"
     
     # Resource limits
     deploy:
