@@ -316,13 +316,16 @@ export async function initDatabase() {
     console.log('📦 Running migrations...');
     
     // Add Discord OAuth columns to users table if they don't exist
+    // Note: We can't add UNIQUE constraint via ALTER TABLE in SQLite when table has data
+    // So we add columns without UNIQUE, and enforce uniqueness via index
     const migrations = [
-      `ALTER TABLE users ADD COLUMN discord_id TEXT UNIQUE`,
+      `ALTER TABLE users ADD COLUMN discord_id TEXT`,
       `ALTER TABLE users ADD COLUMN discord_username TEXT`,
       `ALTER TABLE users ADD COLUMN discord_avatar TEXT`,
       `ALTER TABLE users ADD COLUMN discord_access_token TEXT`,
       `ALTER TABLE users ADD COLUMN discord_refresh_token TEXT`,
       `ALTER TABLE users ADD COLUMN discord_token_expires INTEGER`,
+      `ALTER TABLE users ADD COLUMN last_login INTEGER`,
     ];
 
     for (const migration of migrations) {
@@ -333,6 +336,15 @@ export async function initDatabase() {
         if (!e.message?.includes('duplicate column')) {
           console.warn(`Migration warning: ${e.message}`);
         }
+      }
+    }
+    
+    // Create unique index on discord_id (this is the SQLite way to enforce uniqueness after table creation)
+    try {
+      sqlite.exec(`CREATE UNIQUE INDEX IF NOT EXISTS users_discord_id_unique ON users(discord_id) WHERE discord_id IS NOT NULL`);
+    } catch (e: any) {
+      if (!e.message?.includes('already exists')) {
+        console.warn(`Index creation warning: ${e.message}`);
       }
     }
 
