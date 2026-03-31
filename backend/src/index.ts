@@ -25,6 +25,7 @@ import { commandsRoutes } from '@/api/routes/commands';
 import { aiRoutes } from '@/api/routes/ai';
 import { analyticsRoutes } from '@/api/routes/analytics';
 import { settingsRoutes } from '@/api/routes/settings';
+import { adminSettingsRoutes } from '@/api/routes/admin-settings';
 import { wsManager } from '@/ws';
 import { botManager } from '@/bot';
 import { rpcManager } from '@/bot/rpc';
@@ -109,6 +110,7 @@ function createApp() {
     .use(aiRoutes)
     .use(analyticsRoutes)
     .use(settingsRoutes)
+    .use(adminSettingsRoutes)
     
     // WebSocket endpoint
     .ws('/ws', {

@@ -15,6 +15,20 @@ const timestamps = {
 };
 
 // ============================================================================
+// SYSTEM SETTINGS (App-wide configuration stored in DB, not env vars)
+// ============================================================================
+
+export const systemSettings = sqliteTable('system_settings', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  key: text('key').notNull().unique(),
+  value: text('value'), // Can be null for unset
+  encrypted: integer('encrypted', { mode: 'boolean' }).notNull().default(false),
+  description: text('description'),
+  category: text('category').notNull().default('general'), // 'discord', 'security', 'ai', 'features'
+  ...timestamps,
+});
+
+// ============================================================================
 // USER MANAGEMENT
 // ============================================================================
 
@@ -355,3 +369,6 @@ export type NewNitroSniper = typeof nitroSnipers.$inferInsert;
 
 export type GiveawayConfig = typeof giveawayConfigs.$inferSelect;
 export type NewGiveawayConfig = typeof giveawayConfigs.$inferInsert;
+
+export type SystemSetting = typeof systemSettings.$inferSelect;
+export type NewSystemSetting = typeof systemSettings.$inferInsert;

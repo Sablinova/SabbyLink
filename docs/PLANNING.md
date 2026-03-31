@@ -1,9 +1,9 @@
 # SabbyLink - Complete Project Planning Document
 
-**Version:** 1.0.0  
-**Last Updated:** March 30, 2026  
+**Version:** 1.2.0  
+**Last Updated:** March 31, 2026  
 **License:** GPL-3.0  
-**Status:** Planning Complete - Ready for Implementation
+**Status:** Implementation - Dashboard Config Complete
 
 ---
 
@@ -1921,7 +1921,40 @@ find "$BACKUP_DIR" -name "*.tar.gz" -mtime +7 -delete
 - Code review process?
 - **Decision**: Yes, create CONTRIBUTING.md with clear guidelines
 
-### 13.3 Future Enhancements (Post-Launch)
+### 13.3 Dashboard-Based Configuration (Zero VPS Config)
+
+**v1.2 Implementation (Completed March 31, 2026)**
+
+All application configuration is now manageable from the dashboard. No VPS access required.
+
+**System Settings (`systemSettings` table):**
+- Discord OAuth credentials (Client ID, Secret, Redirect URI)
+- Bot mode (selfbot/bot)
+- Feature toggles (RPC, AI, Nitro Sniper, etc.)
+- Rate limiting settings
+- Security settings
+- Analytics settings
+- Backup settings
+
+**How It Works:**
+1. Settings stored in SQLite `system_settings` table
+2. Sensitive values encrypted with AES-256-GCM
+3. Settings loaded into memory cache at startup
+4. Admin users (user ID 1) can access Settings > Admin tab
+5. Backend falls back to env vars for backwards compatibility
+
+**API Endpoints:**
+- `GET /api/v1/admin/settings` - Get all system settings (admin only)
+- `PUT /api/v1/admin/settings` - Update system settings (admin only)
+- `GET /api/v1/admin/settings/oauth-status` - Check Discord OAuth status
+
+**Files:**
+- `backend/src/config/settings.ts` - Settings service with cache
+- `backend/src/api/routes/admin-settings.ts` - Admin API routes
+- `backend/src/db/schema.ts` - `systemSettings` table
+- `frontend/src/pages/SettingsPage.tsx` - Admin tab in Settings page
+
+### 13.4 Future Enhancements (Post-Launch)
 
 **v2.0 Ideas:**
 - Mobile app (React Native)

@@ -3,6 +3,9 @@
  * 
  * Handles Discord OAuth2 authentication flow for dashboard login
  * and User App token management for slash commands (hybrid mode).
+ * 
+ * OAuth credentials are loaded from database (dashboard-configurable),
+ * with fallback to env vars for backwards compatibility.
  */
 
 import { Elysia, t } from 'elysia';
@@ -13,6 +16,35 @@ import { sign } from 'jsonwebtoken';
 import { env } from '../../config/env';
 import { logger } from '../../utils/logger';
 import { encrypt, decrypt } from '../../utils/crypto';
+import { 
+  getDiscordOAuthConfig, 
+  isDiscordOAuthConfigured,
+  getSetting,
+  SETTING_KEYS,
+} from '../../config/settings';
+
+/**
+ * Get Discord OAuth credentials from database or env vars
+ */
+function getOAuthCredentials() {
+  // Try database first (dashboard-configured)
+  const dbConfig = getDiscordOAuthConfig();
+  
+  if (dbConfig.clientId && dbConfig.clientSecret && dbConfig.redirectUri) {
+    return {
+      clientId: dbConfig.clientId,
+      clientSecret: dbConfig.clientSecret,
+      redirectUri: dbConfig.redirectUri,
+    };
+  }
+  
+  // Fallback to env vars for backwards compatibility
+  return {
+    clientId: env.DISCORD_CLIENT_ID,
+    clientSecret: env.DISCORD_CLIENT_SECRET,
+    redirectUri: env.DISCORD_REDIRECT_URI,
+  };
+}
 
 // Discord OAuth2 endpoints
 const DISCORD_API = 'https://discord.com/api/v10';
@@ -31,14 +63,20 @@ async function exchangeCode(code: string, redirectUri: string): Promise<{
   expires_in: number;
   token_type: string;
 }> {
+  const creds = getOAuthCredentials();
+  
+  if (!creds.clientId || !creds.clientSecret) {
+    throw new Error('Discord OAuth not configured');
+  }
+  
   const response = await fetch(DISCORD_TOKEN_URL, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded',
     },
     body: new URLSearchParams({
-      client_id: env.DISCORD_CLIENT_ID!,
-      client_secret: env.DISCORD_CLIENT_SECRET!,
+      client_id: creds.clientId,
+      client_secret: creds.clientSecret,
       grant_type: 'authorization_code',
       code,
       redirect_uri: redirectUri,
@@ -62,14 +100,20 @@ async function refreshToken(refreshToken: string): Promise<{
   refresh_token: string;
   expires_in: number;
 }> {
+  const creds = getOAuthCredentials();
+  
+  if (!creds.clientId || !creds.clientSecret) {
+    throw new Error('Discord OAuth not configured');
+  }
+  
   const response = await fetch(DISCORD_TOKEN_URL, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded',
     },
     body: new URLSearchParams({
-      client_id: env.DISCORD_CLIENT_ID!,
-      client_secret: env.DISCORD_CLIENT_SECRET!,
+      client_id: creds.clientId,
+      client_secret: creds.clientSecret,
       grant_type: 'refresh_token',
       refresh_token: refreshToken,
     }),
@@ -134,16 +178,28 @@ export const discordOAuthRoutes = new Elysia({ prefix: '/api/v1/auth/discord' })
    * Get OAuth2 authorization URL
    */
   .get('/url', ({ query }) => {
-    if (!env.DISCORD_CLIENT_ID) {
-      return { error: 'Discord OAuth not configured' };
+    const creds = getOAuthCredentials();
+    
+    if (!creds.clientId) {
+      return { 
+        error: 'Discord OAuth not configured',
+        message: 'Configure Discord Client ID in Admin Settings',
+      };
     }
 
     const state = crypto.randomUUID();
-    const redirectUri = query.redirect_uri || env.DISCORD_REDIRECT_URI;
+    const redirectUri = query.redirect_uri || creds.redirectUri;
+    
+    if (!redirectUri) {
+      return {
+        error: 'Discord OAuth not configured',
+        message: 'Configure Discord Redirect URI in Admin Settings',
+      };
+    }
 
     const params = new URLSearchParams({
-      client_id: env.DISCORD_CLIENT_ID,
-      redirect_uri: redirectUri!,
+      client_id: creds.clientId,
+      redirect_uri: redirectUri,
       response_type: 'code',
       scope: OAUTH_SCOPES,
       state,
@@ -166,14 +222,18 @@ export const discordOAuthRoutes = new Elysia({ prefix: '/api/v1/auth/discord' })
   .post('/callback', async ({ body, set }) => {
     try {
       const { code, redirect_uri } = body;
+      const creds = getOAuthCredentials();
 
-      if (!env.DISCORD_CLIENT_ID || !env.DISCORD_CLIENT_SECRET) {
+      if (!creds.clientId || !creds.clientSecret) {
         set.status = 500;
-        return { error: 'Discord OAuth not configured' };
+        return { 
+          error: 'Discord OAuth not configured',
+          message: 'Configure Discord OAuth credentials in Admin Settings',
+        };
       }
 
       // Exchange code for tokens
-      const tokens = await exchangeCode(code, redirect_uri || env.DISCORD_REDIRECT_URI!);
+      const tokens = await exchangeCode(code, redirect_uri || creds.redirectUri!);
       
       // Get Discord user info
       const discordUser = await getDiscordUser(tokens.access_token);

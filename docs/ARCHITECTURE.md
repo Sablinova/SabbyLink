@@ -1091,6 +1091,121 @@ CREATE TABLE user_applications (
 );
 ```
 
+### Dashboard-Based Configuration (Zero VPS Config)
+
+SabbyLink supports **complete dashboard-based configuration** - no VPS access required:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                 Configuration Sources (Priority Order)          │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  1. Dashboard Settings (system_settings table) ← Primary        │
+│           │                                                      │
+│           │  If not configured in dashboard...                   │
+│           ▼                                                      │
+│  2. Environment Variables (.env file) ← Fallback                 │
+│           │                                                      │
+│           │  If not set in env...                                │
+│           ▼                                                      │
+│  3. Default Values (hardcoded) ← Last resort                     │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+#### System Settings Table
+
+```sql
+CREATE TABLE system_settings (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  key TEXT NOT NULL UNIQUE,
+  value TEXT,           -- NULL for unset
+  encrypted BOOLEAN DEFAULT false,
+  description TEXT,
+  category TEXT DEFAULT 'general',  -- discord, features, security, etc.
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+#### Available Settings
+
+| Category | Key | Description | Encrypted |
+|----------|-----|-------------|-----------|
+| **discord** | `discord_client_id` | OAuth Application ID | No |
+| **discord** | `discord_client_secret` | OAuth Application Secret | Yes |
+| **discord** | `discord_redirect_uri` | OAuth Callback URL | No |
+| **discord** | `bot_mode` | selfbot or bot | No |
+| **features** | `enable_rpc` | Rich Presence enabled | No |
+| **features** | `enable_ai_responder` | AI auto-reply | No |
+| **features** | `enable_nitro_sniper` | Auto-claim Nitro | No |
+| **security** | `rate_limit_max` | API rate limit | No |
+| **security** | `session_timeout_hours` | JWT expiry | No |
+
+#### Backend Implementation
+
+```typescript
+// backend/src/config/settings.ts
+
+// In-memory cache for performance
+let settingsCache: Map<string, string | null> = new Map();
+
+export function getSetting(key: SettingKey): string | null {
+  // 1. Check cache
+  if (settingsCache.has(key)) {
+    return settingsCache.get(key);
+  }
+  
+  // 2. Load from database
+  const row = db.select().from(systemSettings)
+    .where(eq(systemSettings.key, key)).get();
+  
+  if (row?.value) {
+    const value = row.encrypted ? decrypt(row.value) : row.value;
+    settingsCache.set(key, value);
+    return value;
+  }
+  
+  // 3. Return default
+  const meta = SETTINGS_METADATA.find(m => m.key === key);
+  return meta?.default ?? null;
+}
+
+export function getDiscordOAuthConfig() {
+  return {
+    clientId: getSetting(SETTING_KEYS.DISCORD_CLIENT_ID),
+    clientSecret: getSetting(SETTING_KEYS.DISCORD_CLIENT_SECRET),
+    redirectUri: getSetting(SETTING_KEYS.DISCORD_REDIRECT_URI),
+  };
+}
+```
+
+#### Admin API Routes
+
+```
+GET /api/v1/admin/settings
+  → Returns all settings + metadata (admin only)
+
+PUT /api/v1/admin/settings
+  → Updates settings, refreshes cache (admin only)
+
+GET /api/v1/admin/settings/oauth-status
+  → Returns { configured: boolean }
+```
+
+#### Frontend (Settings > Admin Tab)
+
+Admin users (user ID = 1) see an "Admin" tab in Settings page that allows:
+- Configuring Discord OAuth credentials
+- Toggling features
+- Setting rate limits
+- Adjusting security settings
+
+**Key Files:**
+- `backend/src/config/settings.ts` - Settings service
+- `backend/src/api/routes/admin-settings.ts` - Admin API
+- `frontend/src/pages/SettingsPage.tsx` - Admin tab UI
+
 ### Encryption (AES-256-GCM)
 
 ```typescript

@@ -10,10 +10,13 @@ import {
   Trash2 as TrashIcon,
   RefreshCw as ArrowPathIcon,
   CheckCircle as CheckCircleIcon,
-  AlertTriangle as ExclamationTriangleIcon
+  AlertTriangle as ExclamationTriangleIcon,
+  Shield as ShieldIcon,
+  ExternalLink as ExternalLinkIcon,
 } from 'lucide-react';
 import { useThemeStore } from '../store/theme';
 import { api } from '../lib/api';
+import { useAuthStore } from '../store/auth';
 
 interface UserSettings {
   username: string;
@@ -34,8 +37,25 @@ interface DangerZone {
   resetSettings: boolean;
 }
 
+interface SettingMeta {
+  key: string;
+  label: string;
+  description: string;
+  category: string;
+  type: 'string' | 'boolean' | 'number' | 'select';
+  options?: { value: string; label: string }[];
+  default: string;
+  encrypted?: boolean;
+  required?: boolean;
+}
+
+interface AdminSettings {
+  [key: string]: string | null;
+}
+
 export default function SettingsPage() {
   const { theme, setTheme } = useThemeStore();
+  const { user } = useAuthStore();
   const [settings, setSettings] = useState<UserSettings>({
     username: '',
     email: '',
@@ -62,9 +82,17 @@ export default function SettingsPage() {
     deleteAccount: false,
     resetSettings: false,
   });
+  
+  // Admin settings state
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [adminSettings, setAdminSettings] = useState<AdminSettings>({});
+  const [adminMetadata, setAdminMetadata] = useState<SettingMeta[]>([]);
+  const [oauthConfigured, setOauthConfigured] = useState(false);
+  const [adminLoading, setAdminLoading] = useState(false);
 
   useEffect(() => {
     fetchSettings();
+    checkAdminStatus();
   }, []);
 
   const fetchSettings = async () => {
@@ -80,6 +108,56 @@ export default function SettingsPage() {
       console.error('Failed to fetch settings:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const checkAdminStatus = async () => {
+    try {
+      const response = await api.get('/admin/settings');
+      if (response.data) {
+        setIsAdmin(true);
+        setAdminSettings(response.data.settings || {});
+        setAdminMetadata(response.data.metadata || []);
+        setOauthConfigured(response.data.oauthConfigured || false);
+      }
+    } catch (error: any) {
+      // 403 = not admin, which is fine
+      if (error.response?.status !== 403) {
+        console.error('Failed to check admin status:', error);
+      }
+      setIsAdmin(false);
+    }
+  };
+
+  const fetchAdminSettings = async () => {
+    setAdminLoading(true);
+    try {
+      const response = await api.get('/admin/settings');
+      if (response.data) {
+        setAdminSettings(response.data.settings || {});
+        setOauthConfigured(response.data.oauthConfigured || false);
+      }
+    } catch (error) {
+      console.error('Failed to fetch admin settings:', error);
+    } finally {
+      setAdminLoading(false);
+    }
+  };
+
+  const saveAdminSettings = async () => {
+    setSaving(true);
+    setMessage(null);
+    try {
+      const response = await api.put('/admin/settings', { settings: adminSettings });
+      if (response.data) {
+        setAdminSettings(response.data.settings || {});
+        setOauthConfigured(response.data.oauthConfigured || false);
+        setMessage({ type: 'success', text: 'Admin settings saved successfully!' });
+      }
+    } catch (error: any) {
+      setMessage({ type: 'error', text: error.response?.data?.error || 'Failed to save admin settings' });
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -163,6 +241,7 @@ export default function SettingsPage() {
     { id: 'notifications', name: 'Notifications', icon: BellIcon },
     { id: 'security', name: 'Security', icon: ShieldCheckIcon },
     { id: 'api', name: 'API Keys', icon: KeyIcon },
+    ...(isAdmin ? [{ id: 'admin', name: 'Admin', icon: ShieldIcon }] : []),
     { id: 'danger', name: 'Danger Zone', icon: ExclamationTriangleIcon },
   ];
 
@@ -566,6 +645,155 @@ export default function SettingsPage() {
                       </p>
                     )}
                   </div>
+                </div>
+              </div>
+            )}
+
+            {/* Admin Tab - System Settings (Zero VPS Config) */}
+            {activeTab === 'admin' && isAdmin && (
+              <div className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+                      <ShieldIcon className="w-5 h-5 text-primary-400" />
+                      System Settings
+                    </h2>
+                    <p className="text-gray-400">Configure application-wide settings (no VPS access needed)</p>
+                  </div>
+                  <button
+                    onClick={fetchAdminSettings}
+                    disabled={adminLoading}
+                    className="p-2 text-gray-400 hover:text-white transition-colors"
+                    title="Refresh"
+                  >
+                    <ArrowPathIcon className={`w-5 h-5 ${adminLoading ? 'animate-spin' : ''}`} />
+                  </button>
+                </div>
+
+                {/* Discord OAuth Status */}
+                <div className={`p-4 rounded-lg border ${oauthConfigured ? 'bg-green-500/10 border-green-500/30' : 'bg-yellow-500/10 border-yellow-500/30'}`}>
+                  <div className="flex items-center gap-3">
+                    {oauthConfigured ? (
+                      <CheckCircleIcon className="w-5 h-5 text-green-400" />
+                    ) : (
+                      <ExclamationTriangleIcon className="w-5 h-5 text-yellow-400" />
+                    )}
+                    <div>
+                      <p className={oauthConfigured ? 'text-green-400' : 'text-yellow-400'}>
+                        {oauthConfigured ? 'Discord OAuth Configured' : 'Discord OAuth Not Configured'}
+                      </p>
+                      <p className="text-sm text-gray-400">
+                        {oauthConfigured 
+                          ? 'Users can login with Discord' 
+                          : 'Configure below to enable Discord login'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Settings by Category */}
+                {['discord', 'features', 'rpc', 'security', 'analytics', 'backup'].map(category => {
+                  const categorySettings = adminMetadata.filter(m => m.category === category);
+                  if (categorySettings.length === 0) return null;
+
+                  return (
+                    <div key={category} className="space-y-4">
+                      <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">
+                        {category}
+                      </h3>
+                      <div className="space-y-3">
+                        {categorySettings.map(meta => (
+                          <div key={meta.key} className="p-4 bg-dark-700 rounded-lg">
+                            <div className="flex items-center justify-between">
+                              <div className="flex-1 mr-4">
+                                <label className="block text-white font-medium">
+                                  {meta.label}
+                                  {meta.required && <span className="text-red-400 ml-1">*</span>}
+                                  {meta.encrypted && <span className="text-yellow-400 ml-2 text-xs">(encrypted)</span>}
+                                </label>
+                                <p className="text-sm text-gray-400">{meta.description}</p>
+                              </div>
+                              <div className="w-64">
+                                {meta.type === 'boolean' ? (
+                                  <button
+                                    onClick={() => setAdminSettings(prev => ({
+                                      ...prev,
+                                      [meta.key]: prev[meta.key] === 'true' ? 'false' : 'true',
+                                    }))}
+                                    className={`w-12 h-6 rounded-full transition-colors ${
+                                      adminSettings[meta.key] === 'true'
+                                        ? 'bg-primary-500'
+                                        : 'bg-dark-600'
+                                    }`}
+                                  >
+                                    <div className={`w-5 h-5 rounded-full bg-white transition-transform ${
+                                      adminSettings[meta.key] === 'true'
+                                        ? 'translate-x-6'
+                                        : 'translate-x-0.5'
+                                    }`} />
+                                  </button>
+                                ) : meta.type === 'select' ? (
+                                  <select
+                                    value={adminSettings[meta.key] || meta.default}
+                                    onChange={(e) => setAdminSettings(prev => ({
+                                      ...prev,
+                                      [meta.key]: e.target.value,
+                                    }))}
+                                    className="w-full bg-dark-600 border border-dark-500 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-primary-500"
+                                  >
+                                    {meta.options?.map(opt => (
+                                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                    ))}
+                                  </select>
+                                ) : (
+                                  <input
+                                    type={meta.encrypted ? 'password' : meta.type === 'number' ? 'number' : 'text'}
+                                    value={adminSettings[meta.key] || ''}
+                                    onChange={(e) => setAdminSettings(prev => ({
+                                      ...prev,
+                                      [meta.key]: e.target.value,
+                                    }))}
+                                    placeholder={meta.default || `Enter ${meta.label}`}
+                                    className="w-full bg-dark-600 border border-dark-500 rounded-lg px-3 py-2 text-white focus:outline-none focus:border-primary-500"
+                                  />
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {/* Help Links */}
+                <div className="p-4 bg-dark-700 rounded-lg space-y-3">
+                  <h3 className="font-medium text-white">Setup Help</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <a
+                      href="https://discord.com/developers/applications"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-2 text-primary-400 hover:text-primary-300 transition-colors"
+                    >
+                      <ExternalLinkIcon className="w-4 h-4" />
+                      Discord Developer Portal
+                    </a>
+                    <p className="text-sm text-gray-400">
+                      Create an app, copy Client ID and Secret, set OAuth2 redirect to your login URL
+                    </p>
+                  </div>
+                </div>
+
+                <div className="pt-4 border-t border-dark-700">
+                  <button
+                    onClick={saveAdminSettings}
+                    disabled={saving}
+                    className="px-6 py-2 bg-primary-500 hover:bg-primary-600 disabled:bg-primary-500/50 text-white rounded-lg transition-colors flex items-center gap-2"
+                  >
+                    {saving && <ArrowPathIcon className="w-4 h-4 animate-spin" />}
+                    Save System Settings
+                  </button>
                 </div>
               </div>
             )}
