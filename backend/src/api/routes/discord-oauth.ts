@@ -218,10 +218,11 @@ export const discordOAuthRoutes = new Elysia({ prefix: '/api/v1/auth/discord' })
 
   /**
    * OAuth2 callback - exchange code for tokens and login/register user
+   * Discord redirects here with GET request containing code and state in query params
    */
-  .post('/callback', async ({ body, set }) => {
+  .get('/callback', async ({ query, set }) => {
     try {
-      const { code, redirect_uri } = body;
+      const { code } = query;
       const creds = getOAuthCredentials();
 
       if (!creds.clientId || !creds.clientSecret) {
@@ -232,8 +233,8 @@ export const discordOAuthRoutes = new Elysia({ prefix: '/api/v1/auth/discord' })
         };
       }
 
-      // Exchange code for tokens
-      const tokens = await exchangeCode(code, redirect_uri || creds.redirectUri!);
+      // Exchange code for tokens (use configured redirect URI)
+      const tokens = await exchangeCode(code, creds.redirectUri!);
       
       // Get Discord user info
       const discordUser = await getDiscordUser(tokens.access_token);
@@ -316,27 +317,27 @@ export const discordOAuthRoutes = new Elysia({ prefix: '/api/v1/auth/discord' })
         { expiresIn: env.JWT_EXPIRES_IN }
       );
 
-      return {
-        token: jwtToken,
-        user: {
-          id: existingUser.id,
-          username: existingUser.username,
-          email: existingUser.email,
-          discordId: discordUser.id,
-          discordUsername: discordUser.username,
-          discordAvatar: discordUser.avatar,
-          lastLogin: new Date(),
-        },
-      };
+      // Redirect to frontend with token in URL fragment (hash)
+      // The frontend will extract the token and store it
+      const redirectUrl = new URL('/', creds.redirectUri!.replace('/api/v1/auth/discord/callback', ''));
+      redirectUrl.searchParams.set('discord_auth', 'success');
+      redirectUrl.searchParams.set('token', jwtToken);
+      
+      set.redirect = redirectUrl.toString();
+      return;
     } catch (error) {
       logger.error('Discord OAuth callback error:', error);
-      set.status = 500;
-      return { error: 'OAuth authentication failed' };
+      // Redirect to frontend with error
+      const errorUrl = new URL('/login', env.FRONTEND_URL || 'https://sabbylink.2b.sablinova.com');
+      errorUrl.searchParams.set('discord_auth', 'error');
+      errorUrl.searchParams.set('message', 'OAuth authentication failed');
+      set.redirect = errorUrl.toString();
+      return;
     }
   }, {
-    body: t.Object({
+    query: t.Object({
       code: t.String(),
-      redirect_uri: t.Optional(t.String()),
+      state: t.Optional(t.String()),
     }),
   })
 
