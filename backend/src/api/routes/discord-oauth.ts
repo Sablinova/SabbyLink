@@ -317,22 +317,25 @@ export const discordOAuthRoutes = new Elysia({ prefix: '/api/v1/auth/discord' })
         { expiresIn: env.JWT_EXPIRES_IN }
       );
 
-      // Redirect to frontend with token in URL fragment (hash)
+      // Redirect to frontend with token in URL params
       // The frontend will extract the token and store it
-      const redirectUrl = new URL('/', creds.redirectUri!.replace('/api/v1/auth/discord/callback', ''));
+      const baseUrl = creds.redirectUri!.replace('/api/v1/auth/discord/callback', '');
+      const redirectUrl = new URL('/', baseUrl);
       redirectUrl.searchParams.set('discord_auth', 'success');
       redirectUrl.searchParams.set('token', jwtToken);
       
-      set.redirect = redirectUrl.toString();
-      return;
+      set.status = 302;
+      set.headers['Location'] = redirectUrl.toString();
+      return '';
     } catch (error) {
       logger.error('Discord OAuth callback error:', error);
       // Redirect to frontend with error
       const errorUrl = new URL('/login', env.FRONTEND_URL || 'https://sabbylink.2b.sablinova.com');
       errorUrl.searchParams.set('discord_auth', 'error');
       errorUrl.searchParams.set('message', 'OAuth authentication failed');
-      set.redirect = errorUrl.toString();
-      return;
+      set.status = 302;
+      set.headers['Location'] = errorUrl.toString();
+      return '';
     }
   }, {
     query: t.Object({
