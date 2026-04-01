@@ -124,9 +124,8 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-      args:
-        - VITE_API_URL=http://backend:3000
-        - VITE_WS_URL=ws://backend:3000
+      # Don't set VITE_API_URL - let it fall back to /api/v1 (nginx proxies to backend)
+      # Don't set VITE_WS_URL - let it use relative /ws path
     container_name: sabbylink-frontend
     restart: unless-stopped
     depends_on:
