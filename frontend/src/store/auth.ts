@@ -22,6 +22,7 @@ interface AuthState {
   logout: () => void;
   checkAuth: () => Promise<void>;
   clearError: () => void;
+  setToken: (token: string) => void;
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -113,6 +114,14 @@ export const useAuthStore = create<AuthState>()(
       },
 
       clearError: () => set({ error: null }),
+
+      setToken: (token: string) => {
+        localStorage.setItem('sabbylink_token', token);
+        set({
+          token,
+          isAuthenticated: true,
+        });
+      },
     }),
     {
       name: 'sabbylink-auth',
