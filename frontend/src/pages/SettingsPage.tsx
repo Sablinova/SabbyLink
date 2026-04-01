@@ -13,6 +13,9 @@ import {
   AlertTriangle as ExclamationTriangleIcon,
   Shield as ShieldIcon,
   ExternalLink as ExternalLinkIcon,
+  MessageCircle as DiscordIcon,
+  Link as LinkIcon,
+  Unlink as UnlinkIcon,
 } from 'lucide-react';
 import { useThemeStore } from '../store/theme';
 import { api } from '../lib/api';
@@ -90,9 +93,20 @@ export default function SettingsPage() {
   const [oauthConfigured, setOauthConfigured] = useState(false);
   const [adminLoading, setAdminLoading] = useState(false);
 
+  // Discord account linking state
+  const [discordStatus, setDiscordStatus] = useState<{
+    linked: boolean;
+    discordId: string | null;
+    discordUsername: string | null;
+    discordAvatar: string | null;
+    tokenValid: boolean;
+  } | null>(null);
+  const [discordLoading, setDiscordLoading] = useState(false);
+
   useEffect(() => {
     fetchSettings();
     checkAdminStatus();
+    fetchDiscordStatus();
   }, []);
 
   const fetchSettings = async () => {
@@ -126,6 +140,46 @@ export default function SettingsPage() {
         console.error('Failed to check admin status:', error);
       }
       setIsAdmin(false);
+    }
+  };
+
+  const fetchDiscordStatus = async () => {
+    try {
+      const response = await api.get('/auth/discord/status');
+      setDiscordStatus(response.data);
+    } catch (error) {
+      console.error('Failed to fetch Discord status:', error);
+      setDiscordStatus(null);
+    }
+  };
+
+  const linkDiscord = async () => {
+    setDiscordLoading(true);
+    try {
+      const response = await api.get('/auth/discord/url');
+      if (response.data?.url) {
+        // Redirect to Discord OAuth
+        window.location.href = response.data.url;
+      } else {
+        setMessage({ type: 'error', text: response.data?.message || 'Discord OAuth not configured' });
+      }
+    } catch (error: any) {
+      setMessage({ type: 'error', text: error.response?.data?.error || 'Failed to get Discord OAuth URL' });
+    } finally {
+      setDiscordLoading(false);
+    }
+  };
+
+  const unlinkDiscord = async () => {
+    setDiscordLoading(true);
+    try {
+      await api.delete('/auth/discord/unlink');
+      setDiscordStatus({ linked: false, discordId: null, discordUsername: null, discordAvatar: null, tokenValid: false });
+      setMessage({ type: 'success', text: 'Discord account unlinked successfully' });
+    } catch (error: any) {
+      setMessage({ type: 'error', text: error.response?.data?.error || 'Failed to unlink Discord account' });
+    } finally {
+      setDiscordLoading(false);
     }
   };
 
@@ -237,6 +291,7 @@ export default function SettingsPage() {
 
   const tabs = [
     { id: 'general', name: 'General', icon: Cog6ToothIcon },
+    { id: 'discord', name: 'Discord', icon: DiscordIcon },
     { id: 'appearance', name: 'Appearance', icon: PaintBrushIcon },
     { id: 'notifications', name: 'Notifications', icon: BellIcon },
     { id: 'security', name: 'Security', icon: ShieldCheckIcon },
@@ -351,6 +406,98 @@ export default function SettingsPage() {
                     Save Changes
                   </button>
                 </div>
+              </div>
+            )}
+
+            {/* Discord Tab */}
+            {activeTab === 'discord' && (
+              <div className="space-y-6">
+                <h2 className="text-lg font-semibold text-white">Discord Account</h2>
+                <p className="text-gray-400">
+                  Link your Discord account to enable User App features, slash commands, and Discord OAuth login.
+                </p>
+                
+                {discordStatus?.linked ? (
+                  <div className="space-y-4">
+                    {/* Linked Account Info */}
+                    <div className="bg-dark-700 rounded-lg p-4 border border-dark-600">
+                      <div className="flex items-center gap-4">
+                        {discordStatus.discordAvatar ? (
+                          <img 
+                            src={`https://cdn.discordapp.com/avatars/${discordStatus.discordId}/${discordStatus.discordAvatar}.png?size=64`}
+                            alt="Discord Avatar"
+                            className="w-16 h-16 rounded-full"
+                          />
+                        ) : (
+                          <div className="w-16 h-16 rounded-full bg-primary-500 flex items-center justify-center">
+                            <DiscordIcon className="w-8 h-8 text-white" />
+                          </div>
+                        )}
+                        <div>
+                          <div className="text-white font-semibold text-lg">{discordStatus.discordUsername}</div>
+                          <div className="text-gray-400 text-sm">Discord ID: {discordStatus.discordId}</div>
+                          <div className={`text-sm mt-1 ${discordStatus.tokenValid ? 'text-green-400' : 'text-yellow-400'}`}>
+                            {discordStatus.tokenValid ? '✓ Token Valid' : '⚠ Token Expired - Re-link to refresh'}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Unlink Button */}
+                    <button
+                      onClick={unlinkDiscord}
+                      disabled={discordLoading}
+                      className="flex items-center gap-2 px-4 py-2 bg-red-500/20 text-red-400 border border-red-500/30 rounded-lg hover:bg-red-500/30 transition-colors disabled:opacity-50"
+                    >
+                      {discordLoading ? (
+                        <ArrowPathIcon className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <UnlinkIcon className="w-4 h-4" />
+                      )}
+                      Unlink Discord Account
+                    </button>
+
+                    <p className="text-gray-500 text-sm">
+                      Note: You can only unlink Discord if you have a password set on your account.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="bg-dark-700 rounded-lg p-6 border border-dark-600 text-center">
+                      <DiscordIcon className="w-16 h-16 mx-auto text-gray-500 mb-4" />
+                      <h3 className="text-white font-semibold mb-2">No Discord Account Linked</h3>
+                      <p className="text-gray-400 text-sm mb-4">
+                        Link your Discord account to access User App features and slash commands.
+                      </p>
+                      <button
+                        onClick={linkDiscord}
+                        disabled={discordLoading}
+                        className="flex items-center gap-2 px-6 py-3 bg-[#5865F2] text-white rounded-lg hover:bg-[#4752C4] transition-colors disabled:opacity-50 mx-auto"
+                      >
+                        {discordLoading ? (
+                          <ArrowPathIcon className="w-5 h-5 animate-spin" />
+                        ) : (
+                          <LinkIcon className="w-5 h-5" />
+                        )}
+                        Link Discord Account
+                      </button>
+                    </div>
+
+                    {!oauthConfigured && isAdmin && (
+                      <div className="bg-yellow-500/20 border border-yellow-500/30 rounded-lg p-4">
+                        <div className="flex items-start gap-3">
+                          <ExclamationTriangleIcon className="w-5 h-5 text-yellow-400 mt-0.5" />
+                          <div>
+                            <div className="text-yellow-400 font-medium">Discord OAuth Not Configured</div>
+                            <p className="text-yellow-400/80 text-sm mt-1">
+                              Go to the Admin tab to configure Discord Client ID and Secret.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
 
