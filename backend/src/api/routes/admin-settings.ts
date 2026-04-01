@@ -16,12 +16,41 @@ import {
   SETTING_KEYS,
 } from '@/config/settings';
 import { logger } from '@/utils/logger';
+import { db, users } from '@/db';
+import { sql } from 'drizzle-orm';
 
-// For now, we'll check if user is the first user (admin)
+// Cache for admin user ID to avoid DB queries on every request
+let cachedAdminUserId: number | null = null;
+
+// Get the first registered user (admin)
+async function getAdminUserId(): Promise<number | null> {
+  if (cachedAdminUserId !== null) {
+    return cachedAdminUserId;
+  }
+  
+  try {
+    const result = db.select({ id: users.id })
+      .from(users)
+      .orderBy(sql`${users.id} ASC`)
+      .limit(1)
+      .get();
+    
+    if (result) {
+      cachedAdminUserId = result.id;
+      return cachedAdminUserId;
+    }
+  } catch (error) {
+    logger.error('Failed to get admin user ID:', error);
+  }
+  
+  return null;
+}
+
+// Check if user is admin (first registered user)
 // TODO: Add proper role-based access control
 async function isAdmin(userId: number): Promise<boolean> {
-  // The first user is admin, or implement proper RBAC later
-  return userId === 1;
+  const adminId = await getAdminUserId();
+  return adminId !== null && userId === adminId;
 }
 
 export const adminSettingsRoutes = new Elysia({ prefix: '/api/v1/admin/settings' })
