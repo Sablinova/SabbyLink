@@ -25,6 +25,7 @@ let cachedAdminUserId: number | null = null;
 // Get the first registered user (admin)
 async function getAdminUserId(): Promise<number | null> {
   if (cachedAdminUserId !== null) {
+    logger.debug(`Using cached admin user ID: ${cachedAdminUserId}`);
     return cachedAdminUserId;
   }
   
@@ -35,8 +36,11 @@ async function getAdminUserId(): Promise<number | null> {
       .limit(1)
       .get();
     
+    logger.debug(`Admin user query result: ${JSON.stringify(result)}`);
+    
     if (result) {
       cachedAdminUserId = result.id;
+      logger.info(`Admin user ID set to: ${cachedAdminUserId}`);
       return cachedAdminUserId;
     }
   } catch (error) {
@@ -50,7 +54,9 @@ async function getAdminUserId(): Promise<number | null> {
 // TODO: Add proper role-based access control
 async function isAdmin(userId: number): Promise<boolean> {
   const adminId = await getAdminUserId();
-  return adminId !== null && userId === adminId;
+  const isAdminResult = adminId !== null && userId === adminId;
+  logger.debug(`isAdmin check: userId=${userId}, adminId=${adminId}, result=${isAdminResult}`);
+  return isAdminResult;
 }
 
 export const adminSettingsRoutes = new Elysia({ prefix: '/api/v1/admin/settings' })
