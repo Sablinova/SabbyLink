@@ -30,11 +30,12 @@ async function getAdminUserId(): Promise<number | null> {
   }
   
   try {
-    const result = db.select({ id: users.id })
+    // Use array destructuring like other routes do
+    const [result] = db.select({ id: users.id })
       .from(users)
       .orderBy(sql`${users.id} ASC`)
       .limit(1)
-      .get();
+      .all();
     
     logger.debug(`Admin user query result: ${JSON.stringify(result)}`);
     
