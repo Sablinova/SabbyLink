@@ -14,6 +14,9 @@ import {
   CheckCircle,
   XCircle,
   Link2,
+  Copy,
+  Terminal,
+  ExternalLink,
 } from 'lucide-react';
 import { api } from '../lib/api';
 
@@ -78,6 +81,27 @@ export default function BotPage() {
   const [discordLinked, setDiscordLinked] = useState(false);
   const [hasUserApp, setHasUserApp] = useState(false);
   const [showModeSelector, setShowModeSelector] = useState(false);
+  const [showTokenExtractor, setShowTokenExtractor] = useState(false);
+  const [extractedToken, setExtractedToken] = useState('');
+  const [copied, setCopied] = useState(false);
+
+  // Token extractor script - runs in browser console on Discord
+  const tokenExtractorScript = `(webpackChunkdiscord_app.push([[''],{},e=>{m=[];for(let c in e.c)m.push(e.c[c])}]),m).find(m=>m?.exports?.default?.getToken!==void 0).exports.default.getToken()`;
+
+  const copyScript = () => {
+    navigator.clipboard.writeText(tokenExtractorScript);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const copyExtractedToken = () => {
+    if (extractedToken) {
+      navigator.clipboard.writeText(extractedToken);
+      setToken(extractedToken);
+      setShowTokenExtractor(false);
+      setExtractedToken('');
+    }
+  };
 
   useEffect(() => {
     // Check Discord link status and user app status
@@ -332,9 +356,21 @@ export default function BotPage() {
                   )}
                 </button>
               </div>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Your token is encrypted and stored securely
-              </p>
+              <div className="mt-2 flex items-center gap-2">
+                <p className="text-xs text-muted-foreground">
+                  Your token is encrypted and stored securely
+                </p>
+                {botMode !== 'bot' && (
+                  <button
+                    type="button"
+                    onClick={() => setShowTokenExtractor(true)}
+                    className="text-xs text-primary hover:underline flex items-center gap-1"
+                  >
+                    <Terminal className="w-3 h-3" />
+                    How to get token?
+                  </button>
+                )}
+              </div>
             </div>
 
             {/* Hybrid Mode - User App Token */}
@@ -435,6 +471,99 @@ export default function BotPage() {
                   Create App
                 </a>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Token Extractor Modal */}
+      {showTokenExtractor && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-card border border-border rounded-xl max-w-lg w-full p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-semibold flex items-center gap-2">
+                <Terminal className="w-5 h-5" />
+                Discord Token Extractor
+              </h3>
+              <button
+                onClick={() => {
+                  setShowTokenExtractor(false);
+                  setExtractedToken('');
+                }}
+                className="text-muted-foreground hover:text-foreground"
+              >
+                <XCircle className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div className="p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
+                <p className="text-sm text-yellow-500 flex items-start gap-2">
+                  <Info className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                  Never share your token with anyone. It gives full access to your Discord account.
+                </p>
+              </div>
+
+              <div>
+                <p className="font-medium mb-2">Step 1: Open Discord in Browser</p>
+                <a
+                  href="https://discord.com/app"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 text-primary hover:underline text-sm"
+                >
+                  <ExternalLink className="w-4 h-4" />
+                  Open discord.com/app
+                </a>
+              </div>
+
+              <div>
+                <p className="font-medium mb-2">Step 2: Open Developer Console</p>
+                <p className="text-sm text-muted-foreground">
+                  Press <kbd className="px-2 py-1 bg-muted rounded text-xs">F12</kbd> or{' '}
+                  <kbd className="px-2 py-1 bg-muted rounded text-xs">Ctrl+Shift+I</kbd> and go to the{' '}
+                  <strong>Console</strong> tab
+                </p>
+              </div>
+
+              <div>
+                <p className="font-medium mb-2">Step 3: Paste this script</p>
+                <div className="relative">
+                  <pre className="p-3 bg-muted rounded-lg text-xs overflow-x-auto whitespace-pre-wrap break-all">
+                    {tokenExtractorScript}
+                  </pre>
+                  <button
+                    onClick={copyScript}
+                    className="absolute top-2 right-2 p-2 bg-background rounded hover:bg-muted transition-colors"
+                  >
+                    {copied ? (
+                      <CheckCircle className="w-4 h-4 text-green-500" />
+                    ) : (
+                      <Copy className="w-4 h-4" />
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <p className="font-medium mb-2">Step 4: Paste your token here</p>
+                <div className="flex gap-2">
+                  <input
+                    type="password"
+                    value={extractedToken}
+                    onChange={(e) => setExtractedToken(e.target.value)}
+                    className="input flex-1"
+                    placeholder="Paste your token here..."
+                  />
+                  <button
+                    onClick={copyExtractedToken}
+                    disabled={!extractedToken}
+                    className="btn-primary"
+                  >
+                    Use Token
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
